@@ -1,7 +1,6 @@
 package base
 
 import (
-	"fmt"
 	"gopkg.in/orivil/orivil.v0"
 )
 
