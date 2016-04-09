@@ -1,10 +1,10 @@
 package orivil
 
 import (
-	"github.com/orivil/event"
-	"github.com/orivil/middle"
-	"github.com/orivil/router"
-	"github.com/orivil/service"
+	"github.com/orivil/event.v0"
+	"github.com/orivil/middle.v0"
+	"github.com/orivil/router.v0"
+	"github.com/orivil/service.v0"
 )
 
 // every bundle register should implement Register interface
@@ -25,23 +25,3 @@ type MiddlewareConfigure interface {
 type ServerEventListener interface {
 	AddServerListener(d *event.Dispatcher)
 }
-
-// example:
-//
-// import (
-//     "orivil/router"
-//     "orivil/middle"
-//     "orivil/service"
-// )
-//
-// type Register struct {}
-
-// func(*Register) RegisterRoute(c *router.Container) {}
-//
-// func(*Register) RegisterService(c *service.Container) {}
-//
-// func(*Register) RegisterMiddle(c *middle.Container) {}
-//
-// func(*Register) Boot(c *service.Container) {}
-//
-// func(*Register) SetMiddle(bag *middle.Bag) {}

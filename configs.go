@@ -1,9 +1,9 @@
 package orivil
 
 import (
-	"github.com/orivil/config"
-	"github.com/orivil/helper"
-	"github.com/orivil/session"
+	"gopkg.in/orivil/config.v0"
+	"gopkg.in/orivil/helper.v0"
+	"gopkg.in/orivil/session.v0"
 	"os"
 	"os/exec"
 	"path/filepath"

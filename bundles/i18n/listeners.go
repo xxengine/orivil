@@ -1,9 +1,9 @@
 package i18n
 
 import (
-	"github.com/orivil/event"
-	"github.com/orivil/helper"
-	"github.com/orivil/orivil"
+	"gopkg.in/orivil/event.v0"
+	"gopkg.in/orivil/helper.v0"
+	"gopkg.in/orivil/orivil.v0"
 	"io"
 	"io/ioutil"
 	"os"
