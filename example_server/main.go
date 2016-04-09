@@ -2,7 +2,7 @@ package main
 
 import (
 	"gopkg.in/orivil/orivil.v0"
-	"gopkg.in/orivil/orivil/example_server/bundle/base"
+	"gopkg.in/orivil/orivil.v0/example_server/bundle/base"
 )
 
 func main() {
