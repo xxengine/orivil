@@ -1,7 +1,7 @@
 package i18n
 
 import (
-	"github.com/orivil/orivil"
+	"gopkg.in/orivil/orivil.v0"
 )
 
 var Config = &struct {

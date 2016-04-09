@@ -1,8 +1,8 @@
 package orivil
 
 import (
-	"github.com/orivil/cache"
-	"github.com/orivil/validate"
+	"gopkg.in/orivil/cache.v0"
+	"gopkg.in/orivil/validate.v0"
 	"regexp"
 )
 

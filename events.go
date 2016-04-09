@@ -1,7 +1,7 @@
 package orivil
 
 import (
-	"github.com/orivil/event"
+	"gopkg.in/orivil/event.v0"
 )
 
 const (

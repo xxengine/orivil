@@ -2,7 +2,7 @@ package base
 
 import (
 	"fmt"
-	"github.com/orivil/orivil"
+	"gopkg.in/orivil/orivil.v0"
 )
 
 type Controller struct {

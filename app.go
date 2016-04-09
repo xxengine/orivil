@@ -2,9 +2,9 @@ package orivil
 
 import (
 	"encoding/json"
-	"github.com/orivil/router"
-	"github.com/orivil/service"
-	"github.com/orivil/session"
+	"gopkg.in/orivil/router.v0"
+	"gopkg.in/orivil/service.v0"
+	"gopkg.in/orivil/session.v0"
 	"log"
 	"mime/multipart"
 	"net/http"

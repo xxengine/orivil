@@ -2,12 +2,12 @@ package orivil
 
 import (
 	"fmt"
-	"github.com/orivil/event"
-	"github.com/orivil/middle"
-	"github.com/orivil/router"
-	"github.com/orivil/service"
-	. "github.com/orivil/session"
-	"github.com/orivil/view"
+	"gopkg.in/orivil/event.v0"
+	"gopkg.in/orivil/middle.v0"
+	"gopkg.in/orivil/router.v0"
+	"gopkg.in/orivil/service.v0"
+	. "gopkg.in/orivil/session.v0"
+	"gopkg.in/orivil/view.v0"
 	"net/http"
 	"path/filepath"
 	"reflect"

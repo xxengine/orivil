@@ -1,10 +1,10 @@
 package base
 
 import (
-	"github.com/orivil/router"
-	"github.com/orivil/service"
-	"github.com/orivil/middle"
-	"github.com/orivil/event"
+	"gopkg.in/orivil/router.v0"
+	"gopkg.in/orivil/service.v0"
+	"gopkg.in/orivil/middle.v0"
+	"gopkg.in/orivil/event.v0"
 )
 
 type Register struct {}
