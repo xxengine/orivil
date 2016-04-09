@@ -1,0 +1,14 @@
+# 配置网站语言, key 为显示在网页中的 language 全名,
+#value 为保存于 cookie 中的 language 短名
+languages:
+  简体中文: "zh-CN"
+  english: "en"
+
+# 设置默认语言, 必须是全名的形式
+defaultlang: "简体中文"
+
+# cookie 键
+cookiekey: "i18n_language"
+
+# 是否在 Server 启动时自动生成 i18n 模板文件
+auto_generate_files: true

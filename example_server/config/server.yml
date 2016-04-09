@@ -1,0 +1,17 @@
+# set debug mode, never open it in product mode
+debug: true
+
+# server domain
+domain: "example.com"
+
+# view file extension
+view_file_ext: ".tmpl"
+
+# session cookie key
+session_key: "orivil-session"
+
+# session cookie max age and session GC check sleep time(/minute)
+session_max_age: 15
+
+# serve out time(/second)
+timeout: 15
