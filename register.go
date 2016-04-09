@@ -1,10 +1,10 @@
 package orivil
 
 import (
-	"github.com/orivil/event.v0"
-	"github.com/orivil/middle.v0"
-	"github.com/orivil/router.v0"
-	"github.com/orivil/service.v0"
+	"gopkg.in/orivil/event.v0"
+	"gopkg.in/orivil/middle.v0"
+	"gopkg.in/orivil/router.v0"
+	"gopkg.in/orivil/service.v0"
 )
 
 // every bundle register should implement Register interface
