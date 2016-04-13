@@ -1,5 +1,7 @@
 # Orivil web framework
 
+[![Gitter](https://badges.gitter.im/orivil/orivil.svg)](https://gitter.im/orivil/orivil?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 **Note:** 目前为测试版(v0)，非常欢迎大家对 Orivil 框架提出意见或建议，请暂时不要用于开发正式项目.
 
 ## Install
