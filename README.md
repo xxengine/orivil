@@ -10,7 +10,7 @@ go get -v gopkg.in/orivil/orivil.v0
 
 ## Test
 
-* cd {$GOPATH}/src/gopkg.in/orivil/orivil.v0/example_server
+* cd $GOPATH/src/gopkg.in/orivil/orivil.v0/example_server
 
 * go run main.go
 
