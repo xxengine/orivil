@@ -12,6 +12,9 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"log"
+	"github.com/orivil/gracehttp"
+	"time"
 )
 
 const (
@@ -34,6 +37,12 @@ type NotFoundHandler interface {
 	NotFound(w http.ResponseWriter, r *http.Request)
 }
 
+// CloseAble
+type CloseAble interface {
+
+	Close()
+}
+
 type Server struct {
 	SContainer      *service.Container
 	MContainer      *middle.Container
@@ -45,7 +54,7 @@ type Server struct {
 	fileHandler     FileHandler
 	notFoundHandler NotFoundHandler
 	timeOutHandler  http.Handler
-	*http.Server
+	*gracehttp.Server
 }
 
 func NewServer(addr string) *Server {
@@ -101,12 +110,9 @@ func NewServer(addr string) *Server {
 		Dispatcher: dispatcher,
 	}
 
-	// TODO:
-	// time out handler
-	//outTime := time.Duration(CfgApp.Timeout) * time.Second
-	//timeOutHandler := http.TimeoutHandler(server, outTime, "")
-	//server.Server = &http.Server{Addr: addr, Handler: timeOutHandler}
-	server.Server = &http.Server{Addr: addr, Handler: server}
+	timeOut := time.Second * time.Duration(CfgApp.Timeout)
+	server.Server = gracehttp.NewServer(addr, server, timeOut, timeOut)
+	server.Server.AddCloseListener(server)
 
 	// set default not found handler
 	server.notFoundHandler = server
@@ -123,6 +129,16 @@ func NewServer(addr string) *Server {
 
 func (s *Server) SetNotFoundHandler(h NotFoundHandler) {
 	s.notFoundHandler = h
+}
+
+func (s *Server) Close() {
+
+	log.Println("closing bundle register...")
+	for _, reg := range s.Registers {
+		if clo, ok := reg.(CloseAble); ok {
+			clo.Close()
+		}
+	}
 }
 
 func (s *Server) SetFileHandler(h FileHandler) {
