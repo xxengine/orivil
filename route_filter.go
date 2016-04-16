@@ -14,12 +14,12 @@ func NewRouteFilter() *RouteFilter {
 	return &RouteFilter{}
 }
 
-// AddStructs 排除所有 structs 中所有的方法
+// AddStructs filter all structs methods
 func (f *RouteFilter) AddStructs(structs []interface{}) {
 	f.structs = structs
 }
 
-// AddActions 排除方法名
+// AddActions filter all actions
 func (f *RouteFilter) AddActions(actions []string) {
 	f.actions = actions
 }

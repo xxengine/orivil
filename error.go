@@ -2,14 +2,10 @@ package orivil
 
 import (
 	"fmt"
-	"log"
 	"net/http"
-	"os"
 	"runtime"
 	"text/template"
 )
-
-var ErrorLogger = log.New(os.Stderr, "", log.Ltime)
 
 var tpl = template.New("error")
 
@@ -44,7 +40,7 @@ func CoverError(w http.ResponseWriter, r *http.Request, call func()) {
 						"errMsg": err,
 						"trace":  trace,
 					})
-					// 同时将错误打印到控制台
+					// Print error messages to the console, because api could not show the message
 					fmt.Println(err)
 					for _, t := range trace {
 						fmt.Println(t)
@@ -53,7 +49,7 @@ func CoverError(w http.ResponseWriter, r *http.Request, call func()) {
 					w.Write([]byte("500 Server Error"))
 
 					addr := GetIp(r)
-					ErrorLogger.Printf("Ip: %s\nUrl: %s\n %v\n", addr, r.URL.String(), err)
+					Err(fmt.Errorf("Ip: %s\nUrl: %s\n %v\n", addr, r.URL.String(), err))
 				}
 			}
 		}

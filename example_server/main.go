@@ -3,6 +3,7 @@ package main
 import (
 	"gopkg.in/orivil/orivil.v0"
 	"gopkg.in/orivil/orivil.v0/example_server/bundle/base"
+	"log"
 )
 
 func main() {
@@ -16,6 +17,6 @@ func main() {
 
 	err := server.ListenAndServe()
 	if err != nil {
-		panic(err)
+		log.Println(err)
 	}
 }
