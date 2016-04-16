@@ -34,6 +34,7 @@ func (this *i18n) Init(cacheDir, defaultLang string, langs []string) {
 
 type defaultTranslator struct{}
 
+// TODO: build a default translator
 func (this *defaultTranslator) Translate(src, srcLang, dstLang string) (dst string) {
 	return ""
 }
@@ -65,6 +66,7 @@ func (this *i18n) Filter(msg, currentLang string) (i18nMsg string) {
 	}
 }
 
+// SetTranslator set customer translator
 func (this *i18n) SetTranslator(t Translator) {
 	this.translator = t
 }
@@ -73,11 +75,13 @@ func (this *i18n) AddMsgs(msg ...string) {
 	this.msgs = append(this.msgs, msg...)
 }
 
+// AddValidator for store validator messages
 func (this *i18n) AddValidator(v ...*validate.Validate) {
 
 	this.validators = append(this.validators, v...)
 }
 
+// UpdateI18nConfig for update i18n msgs
 func UpdateI18nConfig() {
 	msgs := GetValidatorMsgs(I18n.validators...)
 	compileMsgs(I18n.msgs, msgs)

@@ -20,10 +20,10 @@ var Config = &struct {
 	Auto_generate_files: true,
 }
 
-// 短名对应的全名
+// sortName: fullName
 var langs map[string]string
 
-// 根据语言短名获取全民
+// use shortName for get fullName
 func GetFullName(shortName string) string {
 	return langs[shortName]
 }

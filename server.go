@@ -22,8 +22,15 @@ const (
 )
 
 var (
-	// the unique key for server
+	// the unique key for server, Orivil will read the value from config file "app.yml"
 	Key string
+
+	// Err for handle errors, every one could used it to handle error, and
+	// this method must be redefined by customers
+	Err = func(e error) {
+
+		log.Println(e)
+	}
 )
 
 type FileHandler interface {
@@ -59,41 +66,36 @@ type Server struct {
 
 func NewServer(addr string) *Server {
 
-	// public service container 公共服务容器 , 主要用于对 service
-	// provider 的存储, 如果从此容器中获取 service, 则该 service
-	// 存在数据竞争, 每次 http 请求还会产生一个私有容器, 用于获取
-	// service, 从私有容器中获取的 service 是数据安全的, 不必担心私
-	// 有容器和公共容器该用在什么场合, 当你存 service 的时候自动存入
-	// public container 公共容器, 取 service 的时候自动去 private
-	// container 中取
+	// public service container, for store "service providers"
 	sContainer := service.NewPublicContainer()
 
-	// middleware bag 用于中间件的配置及匹配
+	// middleware bag for config middlewares and match middlewares
 	middleBag := middle.NewMiddlewareBag()
 
-	// middleware container 中间件容器依赖于服务容器, 存中间件服务时用
-	// 公共容器, 取中间件服务时用私有容器
+	// middleware container dependent on service container, for store
+	// middlewares to service container
 	mContainer := middle.NewContainer(middleBag, sContainer)
 
 	// view compiler
 	compiler := view.NewContainer(CfgApp.Debug, CfgApp.View_file_ext)
 
-	// route filter 排除 controller 的 action 被注册进路由
+	// RouteFilter for filter controller actions to register to router
 	routeFilter := NewRouteFilter()
-	// 排除 controller 继承的方法, every controller should extend App struct
+	// filter controller extends methods to register to router
 	routeFilter.AddStructs([]interface{}{
 		&App{},
 	})
-	// 排除方法名
+
+	// filter actions to register to router
 	routeFilter.AddActions([]string{
 		"SetMiddle",
 	})
 
-	// route container collect all of the controller comment,
-	// add the then to the router if possible
+	// route container collect all of the controller comment, and add
+	// them to the router if possible
 	rContainer := router.NewContainer(DirBundle, routeFilter)
 
-	// server dispatcher, only dispatch server event when server start
+	// server dispatcher, for dispatch server event when server start
 	dispatcher := event.NewDispatcher()
 	dispatcher.AddEvents(serverEvents)
 	dispatcher.AddListener(
@@ -110,8 +112,13 @@ func NewServer(addr string) *Server {
 		Dispatcher: dispatcher,
 	}
 
+	// use the grace http server as default http server, this server could
+	// be hot update
 	timeOut := time.Second * time.Duration(CfgApp.Timeout)
 	server.Server = gracehttp.NewServer(addr, server, timeOut, timeOut)
+
+	// when the grace http server received 'stop signal', the current server
+	// will be closed, and before that, the "bundles" must be closed first
 	server.Server.AddCloseListener(server)
 
 	// set default not found handler
@@ -127,10 +134,12 @@ func NewServer(addr string) *Server {
 	return server
 }
 
+// SetNotFoundHandler for handle 404 not found
 func (s *Server) SetNotFoundHandler(h NotFoundHandler) {
 	s.notFoundHandler = h
 }
 
+// Close for close bundle registers, this function will be auto executed
 func (s *Server) Close() {
 
 	log.Println("closing bundle register...")
@@ -141,23 +150,29 @@ func (s *Server) Close() {
 	}
 }
 
+// SetFileHandler for set customer file handler
 func (s *Server) SetFileHandler(h FileHandler) {
 	s.fileHandler = h
 }
 
+// AddServerListener for add server event listeners
 func (s *Server) AddServerListener(ls ...event.Listener) {
 	s.Dispatcher.AddListener(ls...)
 }
 
+// HandleFile for judge the client whether or not to request a static file
+// this function could be replaced by customers
 func (s *Server) HandleFile(url string) bool {
 	return filepath.Ext(url) != ""
 }
 
+// ServeFile for serve static file, this function could be replaced by customers
 func (s *Server) ServeFile(w http.ResponseWriter, r *http.Request, name string) {
 	http.ServeFile(w, r, name)
 }
 
-// ServeHTTP the http serve handler, every request goes through the function
+// ServeHTTP for serve http request, every request goes through the function,
+// include static file request
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	// handle static file
@@ -183,6 +198,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					Container: privateContainer,
 					viewData:  make(map[string]interface{}, 1),
 				}
+
+				// set "app" instance to private container, so the private container could
+				// use "app" as service
 				app.SetInstance(SvcApp, app)
 
 				// match middleware, new middleware and cache them in the
@@ -228,11 +246,12 @@ func (s *Server) NotFound(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
 }
 
+// sent for send view file or api data
 func (s *Server) send(a *App) {
 	// send view file
 	if len(a.viewFile) > 0 {
 		bundle := a.Action[0:strings.Index(a.Action, ".")]
-		// a.viewFile may contains sub dir like "/admin/login.tpl"
+		// 'a.viewFile' may contains sub dir like "/admin/login.tpl"
 		dir := filepath.Join(DirBundle, bundle, "view", a.viewSubDir)
 		err := s.VContainer.Display(a.Response, dir, a.viewFile, a.viewData)
 		if err != nil {
@@ -304,7 +323,8 @@ func (s *Server) PrintMsg() {
 }
 
 func (s *Server) Run() {
-	// add listeners from provider registered
+
+	// add listeners from bundle registers
 	s.addServerListener(s.Registers)
 
 	// register service
@@ -331,6 +351,7 @@ func (s *Server) addServerListener(registers []Register) {
 	}
 }
 
+// RegisterBundle for add bundle register to the server
 func (s *Server) RegisterBundle(app ...Register) {
 	s.Registers = append(s.Registers, app...)
 }
