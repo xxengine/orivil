@@ -266,6 +266,7 @@ func (s *Server) send(a *App, terminate bool) {
 		}
 	}
 	// init view data, for terminate middleware
+	a.viewFile = ""
 	a.viewData = nil
 }
 
