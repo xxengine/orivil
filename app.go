@@ -5,18 +5,20 @@ import (
 	"gopkg.in/orivil/router.v0"
 	"gopkg.in/orivil/service.v0"
 	"gopkg.in/orivil/session.v0"
-	"log"
 	"mime/multipart"
 	"net/http"
 	"net/url"
 	"strings"
 	"unicode"
+	"path/filepath"
+	"gopkg.in/orivil/view.v0"
 )
 
 type App struct {
 	Response         http.ResponseWriter
 	Request          *http.Request
 	Container        *service.Container // private container
+	VContainer       *view.Container
 	Params           router.Param
 	Action           string             // action full name like "package.controller.index"
 	viewData         map[string]interface{}
@@ -27,6 +29,7 @@ type App struct {
 	sessionContainer *service.Container
 	viewSubDir       string
 	currentLang      string
+	usedApi          bool
 }
 
 // used for I18n
@@ -49,7 +52,9 @@ func (app *App) Form() url.Values {
 	if app.Request.PostForm == nil {
 		err := app.Request.ParseForm()
 		if err != nil {
-			log.Panic(err)
+			// stop going down, the server will recover the error and handle it with
+			// 'orivil.Err()' method
+			panic(err)
 		}
 	}
 	return app.Request.PostForm
@@ -126,7 +131,7 @@ func (app *App) JsonEncode(data interface{}) {
 	eco := json.NewEncoder(app.Response)
 	err := eco.Encode(data)
 	if err != nil {
-		log.Panic(err)
+		panic(err)
 	}
 }
 
@@ -197,6 +202,30 @@ func (app *App) IsGet() bool {
 func (app *App) WriteString(str string) {
 
 	app.Response.Write([]byte(str))
+}
+
+// Flash could send the file or api data to client immediately, view file could be
+// send many times, but api data can only be sent once
+func (app *App) Flash() {
+	// send view file
+	if app.viewFile != "" {
+		dir := filepath.Join(DirBundle, app.viewBundle, "view", app.viewSubDir)
+		err := app.VContainer.Display(app.Response, dir, app.viewFile, app.viewData)
+		if err != nil {
+			panic(err)
+		}
+
+	// api data can only be sent once
+	} else if !app.usedApi {
+		// send api data
+		if len(app.viewData) > 0 {
+			app.JsonEncode(app.viewData)
+			app.usedApi = true
+		}
+	}
+	// init datas
+	app.viewFile = ""
+	app.viewData = nil
 }
 
 func lowerFirstLetter(s string) string {

@@ -196,6 +196,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					Response:  w,
 					Request:   r,
 					Container: privateContainer,
+					VContainer: s.VContainer,
 					viewData:  make(map[string]interface{}, 1),
 				}
 
@@ -226,13 +227,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				actionFun.Func.Call([]reflect.Value{value})
 
 				// send view file or api data
-				s.send(app, false)
+				app.Flash()
 
 				// call "Terminate" middlewares
 				s.callMiddlesTerminate(middles, app)
 
 				// just send view file, not api data
-				s.send(app, true)
+				app.Flash()
 			} else {
 				s.notFoundHandler.NotFound(w, r)
 			}
@@ -247,27 +248,6 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // implement NotFoundHandler interface
 func (s *Server) NotFound(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
-}
-
-// sent for send view file or api data
-func (s *Server) send(a *App, terminate bool) {
-	// send view file
-	if a.viewFile != "" {
-		dir := filepath.Join(DirBundle, a.viewBundle, "view", a.viewSubDir)
-		err := s.VContainer.Display(a.Response, dir, a.viewFile, a.viewData)
-		if err != nil {
-			panic(err)
-		}
-		// terminate middleware should never send a api data
-	} else if !terminate {
-		// send api data
-		if len(a.viewData) > 0 {
-			a.JsonEncode(a.viewData)
-		}
-	}
-	// init view data, for terminate middleware
-	a.viewFile = ""
-	a.viewData = nil
 }
 
 func (s *Server) storeSession(a *App) {
