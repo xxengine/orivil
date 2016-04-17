@@ -226,10 +226,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				actionFun.Func.Call([]reflect.Value{value})
 
 				// send view file or api data
-				s.send(app)
+				s.send(app, false)
 
 				// call "Terminate" middlewares
 				s.callMiddlesTerminate(middles, app)
+
+				// just send view file, not api data
+				s.send(app, true)
 			} else {
 				s.notFoundHandler.NotFound(w, r)
 			}
@@ -247,22 +250,23 @@ func (s *Server) NotFound(w http.ResponseWriter, r *http.Request) {
 }
 
 // sent for send view file or api data
-func (s *Server) send(a *App) {
+func (s *Server) send(a *App, terminate bool) {
 	// send view file
-	if len(a.viewFile) > 0 {
-		bundle := a.Action[0:strings.Index(a.Action, ".")]
-		// 'a.viewFile' may contains sub dir like "/admin/login.tpl"
-		dir := filepath.Join(DirBundle, bundle, "view", a.viewSubDir)
+	if a.viewFile != "" {
+		dir := filepath.Join(DirBundle, a.viewBundle, "view", a.viewSubDir)
 		err := s.VContainer.Display(a.Response, dir, a.viewFile, a.viewData)
 		if err != nil {
 			panic(err)
 		}
-	} else {
+		// terminate middleware should never send a api data
+	} else if !terminate {
 		// send api data
 		if len(a.viewData) > 0 {
 			a.JsonEncode(a.viewData)
 		}
 	}
+	// init view data, for terminate middleware
+	a.viewData = nil
 }
 
 func (s *Server) storeSession(a *App) {
@@ -299,8 +303,8 @@ func (s *Server) callMiddles(middles []interface{}, app *App) {
 
 func (s *Server) callMiddlesTerminate(middles []interface{}, app *App) {
 	for _, middle := range middles {
-		if requestHandler, ok := middle.(TerminateHandler); ok {
-			requestHandler.Terminate(app)
+		if h, ok := middle.(TerminateHandler); ok {
+			h.Terminate(app)
 		}
 	}
 }

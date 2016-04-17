@@ -18,8 +18,9 @@ type App struct {
 	Request          *http.Request
 	Container        *service.Container // private container
 	Params           router.Param
-	Action           string // action full name like "package.controller.index"
+	Action           string             // action full name like "package.controller.index"
 	viewData         map[string]interface{}
+	viewBundle       string
 	viewFile         string
 	memorySession    *session.Session
 	permanentSession *session.Session
@@ -63,16 +64,16 @@ func (app *App) Query() url.Values {
 // it will set the action name's first letter to lowercase
 func (app *App) View(file ...string) *App {
 
-	if app.viewFile == "" {
-		var viewFile string
-		if len(file) > 0 {
-			viewFile = file[0]
-		} else {
-			// use action name as file name
-			viewFile = lowerFirstLetter(app.Action[strings.LastIndex(app.Action, ".")+1:])
-		}
-
-		app.viewFile = viewFile
+	if len(file) == 1 {
+		app.viewFile = file[0]
+		app.viewBundle = app.Action[0:strings.Index(app.Action, ".")]
+	} else if len(file) == 2 {
+		app.viewBundle = file[0]
+		app.viewFile = file[1]
+	} else {
+		app.viewBundle = app.Action[0:strings.Index(app.Action, ".")]
+		// use action name as file name
+		app.viewFile = lowerFirstLetter(app.Action[strings.LastIndex(app.Action, ".") + 1:])
 	}
 	return app
 }
