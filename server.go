@@ -26,10 +26,15 @@ var (
 	Key string
 
 	// Err for handle errors, every one could used it to handle error, and
-	// this method must be redefined by customers
+	// this method can be re-defined by customers
 	Err = func(e error) {
 
 		log.Println(e)
+	}
+
+	Errf = func(format string, args ...interface{}) {
+
+		Err(fmt.Errorf(format, args...))
 	}
 )
 
@@ -231,9 +236,6 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 				// call "Terminate" middlewares
 				s.callMiddlesTerminate(middles, app)
-
-				// just send view file, not api data
-				app.Flash()
 			} else {
 				s.notFoundHandler.NotFound(w, r)
 			}

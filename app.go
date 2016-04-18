@@ -88,31 +88,24 @@ func (app *App) With(name string, data interface{}) {
 	app.viewData[name] = data
 }
 
-func getMsgData(msg, typ string) (data map[string]string) {
-	return map[string]string{
-		"type":    typ,
-		"message": msg,
-	}
-}
-
 func (app *App) Danger(msg string) {
 
-	app.With("msg", getMsgData(I18n.Filter(msg, app.currentLang), "danger"))
+	app.msg(msg, "danger")
 }
 
 func (app *App) Info(msg string) {
 
-	app.With("msg", getMsgData(I18n.Filter(msg, app.currentLang), "info"))
+	app.msg(msg, "info")
 }
 
 func (app *App) Success(msg string) {
 
-	app.With("msg", getMsgData(I18n.Filter(msg, app.currentLang), "success"))
+	app.msg(msg, "success")
 }
 
 func (app *App) Warning(msg string) {
 
-	app.With("msg", getMsgData(I18n.Filter(msg, app.currentLang), "warning"))
+	app.msg(msg, "warning")
 }
 
 func (app *App) FilterI18n(msg string) (i18nMsg string) {
@@ -204,8 +197,8 @@ func (app *App) WriteString(str string) {
 	app.Response.Write([]byte(str))
 }
 
-// Flash could send the file or api data to client immediately, view file could be
-// send many times, but api data can only be sent once
+// Flash could send the file or api data to client immediately, view files can
+// be sent multiple times, but api data can only be sent once
 func (app *App) Flash() {
 	// send view file
 	if app.viewFile != "" {
@@ -225,7 +218,17 @@ func (app *App) Flash() {
 	}
 	// init datas
 	app.viewFile = ""
-	app.viewData = nil
+	app.viewData = make(map[string]interface{}, 1)
+}
+
+func (app *App) msg(msg, typ string) {
+	// set message header for api
+	app.Response.Header().Set("Orivil-Msg", "true")
+
+	app.With("msg", map[string]string{
+		"type":    typ,
+		"message": I18n.Filter(msg, app.currentLang),
+	})
 }
 
 func lowerFirstLetter(s string) string {
