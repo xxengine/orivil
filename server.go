@@ -26,10 +26,15 @@ var (
 	Key string
 
 	// Err for handle errors, every one could used it to handle error, and
-	// this method must be redefined by customers
+	// this method can be re-defined by customers
 	Err = func(e error) {
 
 		log.Println(e)
+	}
+
+	Errf = func(format string, args ...interface{}) {
+
+		Err(fmt.Errorf(format, args...))
 	}
 )
 
@@ -196,6 +201,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					Response:  w,
 					Request:   r,
 					Container: privateContainer,
+					VContainer: s.VContainer,
 					viewData:  make(map[string]interface{}, 1),
 				}
 
@@ -226,7 +232,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				actionFun.Func.Call([]reflect.Value{value})
 
 				// send view file or api data
-				s.send(app)
+				app.Flash()
 
 				// call "Terminate" middlewares
 				s.callMiddlesTerminate(middles, app)
@@ -244,25 +250,6 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // implement NotFoundHandler interface
 func (s *Server) NotFound(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
-}
-
-// sent for send view file or api data
-func (s *Server) send(a *App) {
-	// send view file
-	if len(a.viewFile) > 0 {
-		bundle := a.Action[0:strings.Index(a.Action, ".")]
-		// 'a.viewFile' may contains sub dir like "/admin/login.tpl"
-		dir := filepath.Join(DirBundle, bundle, "view", a.viewSubDir)
-		err := s.VContainer.Display(a.Response, dir, a.viewFile, a.viewData)
-		if err != nil {
-			panic(err)
-		}
-	} else {
-		// send api data
-		if len(a.viewData) > 0 {
-			a.JsonEncode(a.viewData)
-		}
-	}
 }
 
 func (s *Server) storeSession(a *App) {
@@ -299,8 +286,8 @@ func (s *Server) callMiddles(middles []interface{}, app *App) {
 
 func (s *Server) callMiddlesTerminate(middles []interface{}, app *App) {
 	for _, middle := range middles {
-		if requestHandler, ok := middle.(TerminateHandler); ok {
-			requestHandler.Terminate(app)
+		if h, ok := middle.(TerminateHandler); ok {
+			h.Terminate(app)
 		}
 	}
 }

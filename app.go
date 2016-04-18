@@ -5,27 +5,31 @@ import (
 	"gopkg.in/orivil/router.v0"
 	"gopkg.in/orivil/service.v0"
 	"gopkg.in/orivil/session.v0"
-	"log"
 	"mime/multipart"
 	"net/http"
 	"net/url"
 	"strings"
 	"unicode"
+	"path/filepath"
+	"gopkg.in/orivil/view.v0"
 )
 
 type App struct {
 	Response         http.ResponseWriter
 	Request          *http.Request
 	Container        *service.Container // private container
+	VContainer       *view.Container
 	Params           router.Param
-	Action           string // action full name like "package.controller.index"
+	Action           string             // action full name like "package.controller.index"
 	viewData         map[string]interface{}
+	viewBundle       string
 	viewFile         string
 	memorySession    *session.Session
 	permanentSession *session.Session
 	sessionContainer *service.Container
 	viewSubDir       string
 	currentLang      string
+	usedApi          bool
 }
 
 // used for I18n
@@ -48,7 +52,9 @@ func (app *App) Form() url.Values {
 	if app.Request.PostForm == nil {
 		err := app.Request.ParseForm()
 		if err != nil {
-			log.Panic(err)
+			// stop going down, the server will recover the error and handle it with
+			// 'orivil.Err()' method
+			panic(err)
 		}
 	}
 	return app.Request.PostForm
@@ -63,16 +69,16 @@ func (app *App) Query() url.Values {
 // it will set the action name's first letter to lowercase
 func (app *App) View(file ...string) *App {
 
-	if app.viewFile == "" {
-		var viewFile string
-		if len(file) > 0 {
-			viewFile = file[0]
-		} else {
-			// use action name as file name
-			viewFile = lowerFirstLetter(app.Action[strings.LastIndex(app.Action, ".")+1:])
-		}
-
-		app.viewFile = viewFile
+	if len(file) == 1 {
+		app.viewFile = file[0]
+		app.viewBundle = app.Action[0:strings.Index(app.Action, ".")]
+	} else if len(file) == 2 {
+		app.viewBundle = file[0]
+		app.viewFile = file[1]
+	} else {
+		app.viewBundle = app.Action[0:strings.Index(app.Action, ".")]
+		// use action name as file name
+		app.viewFile = lowerFirstLetter(app.Action[strings.LastIndex(app.Action, ".") + 1:])
 	}
 	return app
 }
@@ -82,31 +88,24 @@ func (app *App) With(name string, data interface{}) {
 	app.viewData[name] = data
 }
 
-func getMsgData(msg, typ string) (data map[string]string) {
-	return map[string]string{
-		"type":    typ,
-		"message": msg,
-	}
-}
-
 func (app *App) Danger(msg string) {
 
-	app.With("msg", getMsgData(I18n.Filter(msg, app.currentLang), "danger"))
+	app.msg(msg, "danger")
 }
 
 func (app *App) Info(msg string) {
 
-	app.With("msg", getMsgData(I18n.Filter(msg, app.currentLang), "info"))
+	app.msg(msg, "info")
 }
 
 func (app *App) Success(msg string) {
 
-	app.With("msg", getMsgData(I18n.Filter(msg, app.currentLang), "success"))
+	app.msg(msg, "success")
 }
 
 func (app *App) Warning(msg string) {
 
-	app.With("msg", getMsgData(I18n.Filter(msg, app.currentLang), "warning"))
+	app.msg(msg, "warning")
 }
 
 func (app *App) FilterI18n(msg string) (i18nMsg string) {
@@ -125,7 +124,7 @@ func (app *App) JsonEncode(data interface{}) {
 	eco := json.NewEncoder(app.Response)
 	err := eco.Encode(data)
 	if err != nil {
-		log.Panic(err)
+		panic(err)
 	}
 }
 
@@ -196,6 +195,40 @@ func (app *App) IsGet() bool {
 func (app *App) WriteString(str string) {
 
 	app.Response.Write([]byte(str))
+}
+
+// Flash could send the file or api data to client immediately, view files can
+// be sent multiple times, but api data can only be sent once
+func (app *App) Flash() {
+	// send view file
+	if app.viewFile != "" {
+		dir := filepath.Join(DirBundle, app.viewBundle, "view", app.viewSubDir)
+		err := app.VContainer.Display(app.Response, dir, app.viewFile, app.viewData)
+		if err != nil {
+			panic(err)
+		}
+
+	// api data can only be sent once
+	} else if !app.usedApi {
+		// send api data
+		if len(app.viewData) > 0 {
+			app.JsonEncode(app.viewData)
+			app.usedApi = true
+		}
+	}
+	// init datas
+	app.viewFile = ""
+	app.viewData = make(map[string]interface{}, 1)
+}
+
+func (app *App) msg(msg, typ string) {
+	// set message header for api
+	app.Response.Header().Set("Orivil-Msg", "true")
+
+	app.With("msg", map[string]string{
+		"type":    typ,
+		"message": I18n.Filter(msg, app.currentLang),
+	})
 }
 
 func lowerFirstLetter(s string) string {
