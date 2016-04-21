@@ -21,6 +21,7 @@ type App struct {
 	VContainer       *view.Container
 	Params           router.Param
 	Action           string             // action full name like "package.controller.index"
+	querys           url.Values
 	viewData         map[string]interface{}
 	viewBundle       string
 	viewFile         string
@@ -50,10 +51,11 @@ func (app *App) FormFile(key string) (multipart.File, *multipart.FileHeader, err
 func (app *App) Form() url.Values {
 
 	if app.Request.PostForm == nil {
+		app.Request.FormValue()
 		err := app.Request.ParseForm()
 		if err != nil {
-			// stop going down, the server will recover the error and handle it with
-			// 'orivil.Err()' method
+			// block current http goroutine continue to execute, the server will
+			// recover the error and handle it with 'orivil.Err()' method
 			panic(err)
 		}
 	}
@@ -62,7 +64,10 @@ func (app *App) Form() url.Values {
 
 func (app *App) Query() url.Values {
 
-	return app.Request.URL.Query()
+	if app.querys == nil {
+		app.querys = app.Request.URL.Query()
+	}
+	return app.querys
 }
 
 // View for store the view filename, if use default action name,
@@ -208,7 +213,7 @@ func (app *App) Flash() {
 			panic(err)
 		}
 
-	// api data can only be sent once
+		// api data can only be sent once
 	} else if !app.usedApi {
 		// send api data
 		if len(app.viewData) > 0 {
@@ -221,13 +226,20 @@ func (app *App) Flash() {
 	app.viewData = make(map[string]interface{}, 1)
 }
 
+// Return will flash data to client and block current http goroutine continue
+// to execute
+func (app *App) Return() {
+	app.Flash()
+	Return()
+}
+
 func (app *App) msg(msg, typ string) {
 	// set message header for api
 	app.Response.Header().Set("Orivil-Msg", "true")
 
 	app.With("msg", map[string]string{
 		"type":    typ,
-		"message": I18n.Filter(msg, app.currentLang),
+		"content": I18n.Filter(msg, app.currentLang),
 	})
 }
 

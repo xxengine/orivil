@@ -32,9 +32,30 @@ var (
 		log.Println(e)
 	}
 
+	// this func is no need to re-defined
 	Errf = func(format string, args ...interface{}) {
 
 		Err(fmt.Errorf(format, args...))
+	}
+
+	Emer = func(e error) {
+
+		log.Println(e)
+	}
+
+	Emerf = func(format string, args ...interface{}) {
+
+		Emer(fmt.Errorf(format, args...))
+	}
+
+	Warn = func(e error) {
+
+		log.Println(e)
+	}
+
+	Warnf = func(format string, args ...interface{}) {
+
+		Warn(fmt.Errorf(format, args...))
 	}
 )
 

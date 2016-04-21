@@ -21,8 +21,9 @@ func CoverError(w http.ResponseWriter, r *http.Request, call func()) {
 		err := recover()
 		if err != nil {
 			if data, ok := err.(*redirect); ok {
+
 				http.Redirect(w, r, data.url, data.code)
-			} else {
+			} else if _, ok := err.(*end); !ok {
 
 				w.WriteHeader(http.StatusInternalServerError)
 				if CfgApp.Debug {
