@@ -5,6 +5,12 @@ type redirect struct {
 	code int
 }
 
+type end struct {}
+
+func Return() {
+	panic(&end{})
+}
+
 func RedirectCode(url string, code int) {
 	panic(&redirect{url: url, code: code})
 }
