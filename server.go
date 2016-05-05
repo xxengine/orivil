@@ -1,3 +1,9 @@
+// Copyright 2016 orivil Authors. All rights reserved.
+// Use of this source code is governed by a MIT-style
+// license that can be found in the LICENSE file.
+
+// Package orivil organize all of the server components to be one runnable server,
+// and provides some useful methods.
 package orivil
 
 import (
@@ -15,6 +21,7 @@ import (
 	"log"
 	"github.com/orivil/gracehttp"
 	"time"
+	"gopkg.in/orivil/validate.v0"
 )
 
 const (
@@ -22,17 +29,17 @@ const (
 )
 
 var (
-	// the unique key for server, Orivil will read the value from config file "app.yml"
+// the unique key for server, Orivil will read the value from config file "app.yml"
 	Key string
 
-	// Err for handle errors, every one could used it to handle error, and
-	// this method can be re-defined by customers
+// Err for handle errors, every one could used it to handle error, and
+// this method can be re-defined by customers
 	Err = func(e error) {
 
 		log.Println(e)
 	}
 
-	// this func is no need to re-defined
+// this func is no need to re-defined
 	Errf = func(format string, args ...interface{}) {
 
 		Err(fmt.Errorf(format, args...))
@@ -61,7 +68,7 @@ var (
 
 type FileHandler interface {
 	// HandleFile to check if handle the url as static file
-	HandleFile(url string) bool
+	HandleFile(*http.Request) bool
 	// ServeFile for serve static file
 	ServeFile(w http.ResponseWriter, r *http.Request, fileName string)
 }
@@ -72,7 +79,6 @@ type NotFoundHandler interface {
 
 // CloseAble
 type CloseAble interface {
-
 	Close()
 }
 
@@ -186,10 +192,10 @@ func (s *Server) AddServerListener(ls ...event.Listener) {
 	s.Dispatcher.AddListener(ls...)
 }
 
-// HandleFile for judge the client whether or not to request a static file
+// HandleFile for judge the client whether or not to request a static file,
 // this function could be replaced by customers
-func (s *Server) HandleFile(url string) bool {
-	return filepath.Ext(url) != ""
+func (s *Server) HandleFile(r *http.Request) bool {
+	return filepath.Ext(r.URL.Path) != ""
 }
 
 // ServeFile for serve static file, this function could be replaced by customers
@@ -202,7 +208,7 @@ func (s *Server) ServeFile(w http.ResponseWriter, r *http.Request, name string) 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	// handle static file
-	if s.fileHandler.HandleFile(path) {
+	if s.fileHandler.HandleFile(r) {
 		s.fileHandler.ServeFile(w, r, filepath.Join(DirStaticFile, path))
 	} else {
 		var app *App
@@ -230,16 +236,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				// use "app" as service
 				app.SetInstance(SvcApp, app)
 
-				// match middleware, new middleware and cache them in the
-				// private service container
+				// match middleware
 				middleNames := s.MContainer.Get(action)
 				middles := make([]interface{}, len(middleNames))
 
 				// get middleware instances from private container
-				index := 0
-				for _, service := range middleNames {
+				for index, service := range middleNames {
 					middles[index] = privateContainer.Get(service)
-					index++
 				}
 
 				// call middlewares
@@ -248,7 +251,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				// call controller action
 				value := reflect.ValueOf(controller())
 				s.setControllerDependence(value, app)
-				method := action[strings.LastIndex(action, ".")+1:]
+				method := action[strings.LastIndex(action, ".") + 1:]
 				actionFun, _ := value.Type().MethodByName(method)
 				actionFun.Func.Call([]reflect.Value{value})
 
@@ -295,12 +298,29 @@ func (s *Server) setControllerDependence(controller reflect.Value, app *App) {
 
 func (s *Server) callMiddles(middles []interface{}, app *App) {
 	for _, middle := range middles {
-		if requestHandler, ok := middle.(RequestHandler); ok {
+		switch mid := middle.(type) {
 
-			requestHandler.Handle(app)
-		} else if call, ok := middle.(func(*App)); ok {
+		case RequestHandler:
 
-			call(app)
+			mid.Handle(app)
+		case func(*App):
+
+			mid(app)
+		case *validate.Validate:
+
+			var msg string
+			if app.IsGet() {
+				msg = mid.Valid(app.Query())
+			} else {
+				msg = mid.Valid(app.Form())
+			}
+			if msg != "" {
+				app.Warning(msg)
+				app.Return()
+			}
+		case TerminateHandler:
+		default:
+			panic(fmt.Errorf("unkown middleware type: %v", reflect.TypeOf(middle)))
 		}
 	}
 }
