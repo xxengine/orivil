@@ -1,3 +1,7 @@
+// Copyright 2016 orivil Authors. All rights reserved.
+// Use of this source code is governed by a MIT-style
+// license that can be found in the LICENSE file.
+
 package orivil
 
 import (
@@ -21,7 +25,8 @@ type App struct {
 	VContainer       *view.Container
 	Params           router.Param
 	Action           string             // action full name like "package.controller.index"
-	querys           url.Values
+	query           url.Values
+	form             url.Values
 	viewData         map[string]interface{}
 	viewBundle       string
 	viewFile         string
@@ -50,24 +55,32 @@ func (app *App) FormFile(key string) (multipart.File, *multipart.FileHeader, err
 
 func (app *App) Form() url.Values {
 
-	if app.Request.PostForm == nil {
-		app.Request.FormValue()
+	if app.form == nil {
 		err := app.Request.ParseForm()
 		if err != nil {
 			// block current http goroutine continue to execute, the server will
 			// recover the error and handle it with 'orivil.Err()' method
 			panic(err)
 		}
+		// add route params to form value
+		for key, value := range app.Params {
+			app.Request.PostForm.Add(key, value)
+		}
+		app.form = app.Request.PostForm
 	}
-	return app.Request.PostForm
+	return app.form
 }
 
 func (app *App) Query() url.Values {
 
-	if app.querys == nil {
-		app.querys = app.Request.URL.Query()
+	if app.query == nil {
+		app.query = app.Request.URL.Query()
+		// add route params to query value
+		for key, value := range app.Params {
+			app.query.Add(key, value)
+		}
 	}
-	return app.querys
+	return app.query
 }
 
 // View for store the view filename, if use default action name,

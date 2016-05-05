@@ -1,23 +1,54 @@
-# Orivil web framework
+# Orivil Web Framework
 
-[![Gitter](https://badges.gitter.im/orivil/orivil.svg)](https://gitter.im/orivil/orivil?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+Fast & Simple & Powerful Go Web Framework. Inspired by [Symfony](http://symfony.com/) and [Laravel](https://laravel.com/).
 
-**Note:** 目前为测试版(v0)，非常欢迎大家对 Orivil 框架提出意见或建议，请暂时不要用于开发正式项目.
+## Version
+
+```
+v1.0
+```
+
+## Feature
+
+* Use service container to manage service dependency.
+* Fantastic view file compiler.
+* Semantic configuration Middleware.
+* Auto generate controller routes.
+* Could cache view file, cache services and support memory session.
+* Made up of components, every user could be a contributor.
+* Auto generate I18n files, including view file and configuration file.
+
 
 ## Install
 
 ```
-go get -v gopkg.in/orivil/orivil.v0
+go get -v gopkg.in/orivil/orivil.v1
+```
+
+## Run
+
+```
+cd $GOPATH/src/gopkg.in/orivil/orivil.v1/example_server/base_server
+
+go run main.go
 ```
 
 ## Test
 
-* cd $GOPATH/src/gopkg.in/orivil/orivil.v0/example_server
+```
+Browser view: `http://localhost:8080`
+```
 
-* go run main.go
+## Community
 
-* Browser visit `http://localhost:8000`
+* [orivil.com](http://orivil.com/forum)
+* [Gitter](https://gitter.im/orivil/orivil?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+* QQ群: 416628342
 
+## Contributors
 
-更多介绍请访问 [Orivil 官网](http://orivil.com)
+https://github.com/orivil/orivil/graphs/contributors
+
+## License
+Released under the MIT License.
 
