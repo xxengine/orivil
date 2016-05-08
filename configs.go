@@ -28,7 +28,7 @@ var CfgApp = &struct {
 }{
 	// default config
 	Debug:                     true,
-	Key:                       "jfsjlfmklsiejojwio8392ufk-fc0sjlmp;skf[wfjoshu",
+	Key:                       "--------------------------------------",
 	View_file_ext:             ".tmpl",
 	Memory_session_key:        "orivil-memory-session",
 	Permanent_session_key:     "orivil-permanent-session",
@@ -52,7 +52,10 @@ var Cfg = config.NewConfig(DirConfig)
 
 func init() {
 
-	Cfg.ReadStruct("app.yml", CfgApp)
+	err := Cfg.ReadStruct("app.yml", CfgApp)
+	if err != nil {
+		Errf("%v\nread 'app.yml' got error, use default value instead.", err)
+	}
 
 	Key = CfgApp.Key
 
