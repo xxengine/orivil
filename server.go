@@ -278,8 +278,8 @@ func (s *Server) NotFound(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) storeSession(a *App) {
 	// if permanent session service was used, store it
-	if inst, ok := a.HasGot(SvcPermanentSession); ok {
-		session := inst.(*Session)
+	if session, ok := a.GetCache(SvcPermanentSession).(*Session); ok {
+
 		StorePermanentSession(session)
 	}
 }
