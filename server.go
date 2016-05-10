@@ -234,7 +234,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 				// set "app" instance to private container, so the private container could
 				// use "app" as service
-				app.SetInstance(SvcApp, app)
+				app.AddCache(SvcApp, app)
 
 				// match middleware
 				middleNames := s.MContainer.Get(action)
