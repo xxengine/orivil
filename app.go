@@ -146,14 +146,14 @@ func (app *App) JsonEncode(data interface{}) {
 	}
 }
 
-func (app *App) SetInstance(name string, service interface{}) {
+func (app *App) AddCache(name string, service interface{}) {
 
-	app.Container.SetInstance(name, service)
+	app.Container.AddCache(name, service)
 }
 
-func (app *App) HasGot(service string) (interface{}, bool) {
+func (app *App) GetCache(service string) interface{} {
 
-	return app.Container.HasGot(service)
+	return app.Container.GetCache(service)
 }
 
 func (app *App) SessionContainer() *service.Container {

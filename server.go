@@ -234,7 +234,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 				// set "app" instance to private container, so the private container could
 				// use "app" as service
-				app.SetInstance(SvcApp, app)
+				app.AddCache(SvcApp, app)
 
 				// match middleware
 				middleNames := s.MContainer.Get(action)
@@ -278,8 +278,8 @@ func (s *Server) NotFound(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) storeSession(a *App) {
 	// if permanent session service was used, store it
-	if inst, ok := a.HasGot(SvcPermanentSession); ok {
-		session := inst.(*Session)
+	if session, ok := a.GetCache(SvcPermanentSession).(*Session); ok {
+
 		StorePermanentSession(session)
 	}
 }
