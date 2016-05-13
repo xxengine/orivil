@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"gopkg.in/orivil/router.v0"
 	"gopkg.in/orivil/service.v0"
-	"gopkg.in/orivil/session.v0"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -25,27 +24,15 @@ type App struct {
 	VContainer       *view.Container
 	Params           router.Param
 	Action           string             // action full name like "package.controller.index"
-	query           url.Values
+	query            url.Values
 	form             url.Values
 	viewData         map[string]interface{}
 	viewBundle       string
 	viewFile         string
-	memorySession    *session.Session
-	permanentSession *session.Session
+	memorySession    Session
+	permanentSession PSession
 	sessionContainer *service.Container
-	viewSubDir       string
-	currentLang      string
 	usedApi          bool
-}
-
-// used for I18n
-func SetViewSubDir(dir string, a *App) {
-	a.viewSubDir = dir
-}
-
-// used for I18n
-func SetCurrentLang(lang string, a *App) {
-	a.currentLang = lang
 }
 
 func (app *App) FormFile(key string) (multipart.File, *multipart.FileHeader, error) {
@@ -128,7 +115,11 @@ func (app *App) Warning(msg string) {
 
 func (app *App) FilterI18n(msg string) (i18nMsg string) {
 
-	return I18n.Filter(msg, app.currentLang)
+	if filter, ok := app.Get(SvcI18nFilter).(I18nFilter); ok {
+		return filter.FilterMsg(msg)
+	} else {
+		return msg
+	}
 }
 
 func (app *App) Redirect(url string) {
@@ -174,18 +165,18 @@ func (app *App) GetNew(service string) interface{} {
 	return app.Container.GetNew(service)
 }
 
-func (app *App) Session() *session.Session {
+func (app *App) Session() Session {
 
 	if app.memorySession == nil {
-		app.memorySession = app.Container.Get(SvcMemorySession).(*session.Session)
+		app.memorySession = app.Container.Get(SvcMemorySession).(Session)
 	}
 	return app.memorySession
 }
 
-func (app *App) PSession() *session.Session {
+func (app *App) PSession() PSession {
 
 	if app.permanentSession == nil {
-		app.permanentSession = app.Container.Get(SvcPermanentSession).(*session.Session)
+		app.permanentSession = app.Container.Get(SvcPermanentSession).(PSession)
 	}
 	return app.permanentSession
 }
@@ -220,7 +211,11 @@ func (app *App) WriteString(str string) {
 func (app *App) Flash() {
 	// send view file
 	if app.viewFile != "" {
-		dir := filepath.Join(DirBundle, app.viewBundle, "view", app.viewSubDir)
+		var subDir string
+		if filter, ok := app.Get(SvcI18nFilter).(I18nFilter); ok {
+			subDir = filter.ViewSubDir()
+		}
+		dir := filepath.Join(DirBundle, app.viewBundle, "view", subDir)
 		err := app.VContainer.Display(app.Response, dir, app.viewFile, app.viewData)
 		if err != nil {
 			panic(err)
@@ -252,7 +247,7 @@ func (app *App) msg(msg, typ string) {
 
 	app.With("msg", map[string]string{
 		"type":    typ,
-		"content": I18n.Filter(msg, app.currentLang),
+		"content": app.FilterI18n(msg),
 	})
 }
 
