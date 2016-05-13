@@ -1,8 +1,8 @@
 package main
 
 import (
-	"gopkg.in/orivil/orivil.v0"
-	"gopkg.in/orivil/orivil.v0/example_server/bundle/base"
+	"gopkg.in/orivil/orivil.v1"
+	"gopkg.in/orivil/orivil.v1/example_server/bundle/base"
 	"log"
 )
 
@@ -14,6 +14,8 @@ func main() {
 	)
 
 	server.Run()
+
+	server.PrintMsg()
 
 	err := server.ListenAndServe()
 	if err != nil {

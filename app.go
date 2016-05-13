@@ -185,7 +185,7 @@ func (app *App) Session() *session.Session {
 func (app *App) PSession() *session.Session {
 
 	if app.permanentSession == nil {
-		app.permanentSession = app.Container.Get(SvcMemorySession).(*session.Session)
+		app.permanentSession = app.Container.Get(SvcPermanentSession).(*session.Session)
 	}
 	return app.permanentSession
 }

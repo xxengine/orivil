@@ -1,11 +1,11 @@
 # set debug mode
-debug: true
+debug: false
 
 # the server unique key, must be changed
 key: "u60zpqmcmowawqzpolmkijnvmfjidso934k"
 
 # view file extension
-view_file_ext: ".tmpl"
+view_file_ext: ".blade.php"
 
 # for timeout handler (/second)
 timeout: 10
