@@ -12,7 +12,7 @@ import (
 	"gopkg.in/orivil/middle.v0"
 	"gopkg.in/orivil/router.v0"
 	"gopkg.in/orivil/service.v0"
-	. "gopkg.in/orivil/session.v0"
+	"gopkg.in/orivil/session.v0"
 	"gopkg.in/orivil/view.v0"
 	"net/http"
 	"path/filepath"
@@ -278,9 +278,9 @@ func (s *Server) NotFound(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) storeSession(a *App) {
 	// if permanent session service was used, store it
-	if session, ok := a.GetCache(SvcPermanentSession).(*Session); ok {
+	if s, ok := a.GetCache(SvcPermanentSession).(*session.Session); ok {
 
-		StorePermanentSession(session)
+		session.StorePermanentSession(s)
 	}
 }
 
