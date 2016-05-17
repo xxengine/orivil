@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
-// Package orivil organize all of the server components to be one runnable server,
+// Package orivil organizes all of the server components to be one runnable server,
 // and provides some useful methods.
 package orivil
 
@@ -21,7 +21,6 @@ import (
 	"log"
 	"github.com/orivil/gracehttp"
 	"time"
-	"gopkg.in/orivil/validate.v0"
 )
 
 const (
@@ -229,7 +228,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					Request:   r,
 					Container: privateContainer,
 					VContainer: s.VContainer,
-					viewData:  make(map[string]interface{}, 1),
+					data:  make(map[string]interface{}, 1),
 				}
 
 				// set "app" instance to private container, so the private container could
@@ -306,18 +305,6 @@ func (s *Server) callMiddles(middles []interface{}, app *App) {
 		case func(*App):
 
 			mid(app)
-		case *validate.Validate:
-
-			var msg string
-			if app.IsGet() {
-				msg = mid.Valid(app.Query())
-			} else {
-				msg = mid.Valid(app.Form())
-			}
-			if msg != "" {
-				app.Warning(msg)
-				app.Return()
-			}
 		case TerminateHandler:
 		default:
 			panic(fmt.Errorf("unkown middleware type: %v", reflect.TypeOf(middle)))
@@ -336,7 +323,7 @@ func (s *Server) callMiddlesTerminate(middles []interface{}, app *App) {
 func (s *Server) PrintMsg() {
 	routeMsg := router.GetAllRouteMsg(s.RContainer)
 	fmt.Println()
-	fmt.Println("route message:")
+	fmt.Println("all routes:")
 	for _, msg := range routeMsg {
 		fmt.Println(msg)
 	}
@@ -344,7 +331,7 @@ func (s *Server) PrintMsg() {
 	actions := s.RContainer.GetActions()
 	middleMsg := middle.GetMiddlesMsg(s.MContainer, actions)
 	fmt.Println()
-	fmt.Println("middleware message:")
+	fmt.Println("all middlewares:")
 	for _, msg := range middleMsg {
 		fmt.Println(msg)
 	}

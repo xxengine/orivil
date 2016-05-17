@@ -37,7 +37,7 @@ type App struct {
 	Action           string             // action full name like "package.controller.index"
 	query            url.Values
 	form             url.Values
-	viewData         map[string]interface{}
+	data             map[string]interface{}
 	viewBundle       string
 	viewFile         string
 	memorySession    Session
@@ -138,27 +138,27 @@ func (app *App) View(file ...string) *App {
 
 func (app *App) With(name string, data interface{}) {
 
-	app.viewData[name] = data
+	app.data[name] = data
 }
 
 func (app *App) Danger(msg string) {
 
-	app.msg(msg, "danger")
+	app.Msg(msg, "danger")
 }
 
 func (app *App) Info(msg string) {
 
-	app.msg(msg, "info")
+	app.Msg(msg, "info")
 }
 
 func (app *App) Success(msg string) {
 
-	app.msg(msg, "success")
+	app.Msg(msg, "success")
 }
 
 func (app *App) Warning(msg string) {
 
-	app.msg(msg, "warning")
+	app.Msg(msg, "warning")
 }
 
 func (app *App) FilterI18n(msg string) (i18nMsg string) {
@@ -264,7 +264,7 @@ func (app *App) Flash() {
 			subDir = filter.ViewSubDir()
 		}
 		dir := filepath.Join(DirBundle, app.viewBundle, "view", subDir)
-		err := app.VContainer.Display(app.Response, dir, app.viewFile, app.viewData)
+		err := app.VContainer.Display(app.Response, dir, app.viewFile, app.data)
 		if err != nil {
 			panic(err)
 		}
@@ -272,14 +272,14 @@ func (app *App) Flash() {
 		// api data can only be sent once
 	} else if !app.usedApi {
 		// send api data
-		if len(app.viewData) > 0 {
-			app.JsonEncode(app.viewData)
+		if len(app.data) > 0 {
+			app.JsonEncode(app.data)
 			app.usedApi = true
 		}
 	}
 	// init datas
 	app.viewFile = ""
-	app.viewData = make(map[string]interface{}, 1)
+	app.data = make(map[string]interface{}, 1)
 }
 
 // Return will flash data to client and block current http goroutine continue
@@ -289,9 +289,9 @@ func (app *App) Return() {
 	Return()
 }
 
-func (app *App) msg(msg, typ string) {
+func (app *App) Msg(msg, typ string) {
 	// set message header for api
-	app.Response.Header().Set("Orivil-Msg", "true")
+	app.Response.Header().Set("Orivil-Msg", typ)
 
 	app.With("msg", map[string]string{
 		"type":    typ,

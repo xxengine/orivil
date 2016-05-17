@@ -2,7 +2,6 @@
 
 Fast & Simple & Powerful Go Web Framework. Inspired by [Symfony](http://symfony.com/) and [Laravel](https://laravel.com/).
 
----
 
 ## Version
 
@@ -10,30 +9,21 @@ Fast & Simple & Powerful Go Web Framework. Inspired by [Symfony](http://symfony.
 v1.0
 ```
 
----
-
-
-## Feature
+## Overview
 
 * Use service container to manage services.
 * Fantastic view file compiler.
 * Semantic management of middleware.
-* Auto generate controller routes.
-* Could cache view file, cache services, support memory session.
+* Automatic generate controller routes.
+* Could cache view file, could cache services, support memory session.
 * Made up of components, every user could be a contributor.
-* Auto generate I18n files, including view file and configuration file.
-
----
-
+* Automatic generate I18n files, including view file and configuration file.
 
 ## Install
 
 ```
 go get -v gopkg.in/orivil/orivil.v1
 ```
-
----
-
 
 ## Run Example
 
@@ -43,16 +33,11 @@ cd $GOPATH/src/gopkg.in/orivil/orivil.v1/example_server/base_server
 go run main.go
 ```
 
----
-
-
 ## Test Example
 
 ```
 Browser visit: http://localhost:8080
 ```
-
----
 
 ## ApacheBench Test
 #### Env
@@ -78,26 +63,17 @@ Requests per second:    18693.95 [#/sec] (mean)
 Requests per second:    18150.50 [#/sec] (mean)
 ```
 
----
-
 ## Community
 
 * [orivil.com](http://orivil.com/forum)
 * [Gitter](https://gitter.im/orivil/orivil?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 * QQ群: 416628342
 
----
-
 ## Contributors
 
 https://github.com/orivil/orivil/graphs/contributors
-
----
-
 
 
 ## License
 
 Released under the [MIT License](https://github.com/orivil/orivil/blob/master/LICENSE).
-
----
