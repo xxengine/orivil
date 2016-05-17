@@ -48,6 +48,8 @@ func (*BaseRegister) RegisterService(c *service.Container) {
 		} else {
 			private = sessionContainer.(*service.Container)
 		}
+
+		private.AddCache(SvcApp, c.Get(SvcApp))
 		return private
 	})
 }
