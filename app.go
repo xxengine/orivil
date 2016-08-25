@@ -15,18 +15,17 @@ import (
 	"unicode"
 	"path/filepath"
 	"gopkg.in/orivil/view.v0"
+	"errors"
+	"time"
 )
 
+// FileStorage defines the callback which how to store uploaded files.
 type FileStorage func(srcFile multipart.File, name string) error
 
 // Check error
-var UploadFileTooLarge = func(err error) bool {
+var ErrUploadFileTooLarge = errors.New("upload file too large")
 
-	if err != nil {
-		return err.Error() == "multipart: Part Read: http: request body too large"
-	}
-	return false
-}
+var ErrExitGorountine = errors.New("exit current gorountine")
 
 type App struct {
 	Response         http.ResponseWriter
@@ -34,27 +33,92 @@ type App struct {
 	Container        *service.Container // private container
 	VContainer       *view.Container
 	Params           router.Param
-	Action           string             // action full name like "package.controller.index"
+	Action           string             // looks like "bundle.Controller.Action"
+	Start            time.Time
+	Server           *Server
 	query            url.Values
 	form             url.Values
 	data             map[string]interface{}
-	viewBundle       string
-	viewFile         string
+	viewPages        []view.Page
+	defers           []func()
 	memorySession    Session
 	permanentSession PSession
 	sessionContainer *service.Container
-	usedApi          bool
 }
 
-func (app *App) FormFiles(fileSize, maxMemory int64, store FileStorage) error {
+func GetViewPages(a *App) (ps []view.Page) {
+	for _, p := range a.viewPages {
+		if !p.Debug {
+			ps = append(ps, p)
+		}
+	}
+	return
+}
+
+func GetAllViewPages(a *App) (ps []view.Page) {
+
+	return a.viewPages
+}
+
+func GetMergedFile(a *App) (file []byte, err error) {
+
+	pages := GetViewPages(a)
+	return a.Get(SvcServer).(*Server).VContainer.Combine(pages...)
+}
+
+// FormFiles reads and stores upload files.
+//
+// Usage:
+//
+// Step 1: define the 1st & 2nd parameters:
+//
+// var maxFileSize int64 = 600 << 10 // 600KB
+// var maxMemorySize int64 = 60 << 20 // 60MB
+//
+// Step 2: define the 3rd parameter(a custom function for storing the upload files):
+//
+// var dir = "./uploads"
+// var store orivil.FileStorage = func (srcFile multipart.File, name string) error {
+//
+//	 fileName := filepath.Join(dir, name)
+//
+//	 dstFile, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE, 0666)
+//	 if err != nil {
+//		 return err
+//	 }
+//	 defer dstFile.Close()
+//
+//	 _, err = io.Copy(dstFile, srcFile)
+//	 if err != nil {
+//		 return err
+//	 }
+//	 return nil
+// }
+//
+// Step 3: check errors:
+//
+//	err := app.FormFiles(maxFileSize, maxMemorySize, store)
+//
+//	if orivil.ErrUploadFileTooLarge == err {
+//
+//		fmt.Println("upload file too large")
+//	} else if err != nil {
+//
+//		fmt.Printf("upload file got error: %v", err)
+//	}
+func (app *App) FormFiles(maxFile, maxMemory int64, store FileStorage) error {
 
 	// limit file size
-	app.Request.Body = http.MaxBytesReader(app.Response, app.Request.Body, fileSize)
+	app.Request.Body = http.MaxBytesReader(app.Response, app.Request.Body, maxFile)
 
 	// limit memory size
 	err := app.Request.ParseMultipartForm(maxMemory)
 	if err != nil {
-		return err
+		if err.Error() == "multipart: Part Read: http: request body too large" {
+			return ErrUploadFileTooLarge
+		} else {
+			return err
+		}
 	}
 
 	// collect opened files for closing them
@@ -74,7 +138,6 @@ func (app *App) FormFiles(fileSize, maxMemory int64, store FileStorage) error {
 				return err
 			}
 
-			// append to close-able collections
 			openedFiles = append(openedFiles, file)
 
 			// save the file
@@ -88,57 +151,118 @@ func (app *App) FormFiles(fileSize, maxMemory int64, store FileStorage) error {
 	return nil
 }
 
+// Form reads the cache or parses values from three sources:
+// raw query in the URL;
+// parameters from router;
+// the request body if request method is POST, PUT or PATCH;
 func (app *App) Form() url.Values {
 
 	if app.form == nil {
 		err := app.Request.ParseForm()
 		if err != nil {
-			// block current http goroutine continue to execute, the server will
-			// recover the error and handle it with 'orivil.Err()' method
 			panic(err)
 		}
+		app.form = app.Request.PostForm
+
 		// add route params to form value
 		for key, value := range app.Params {
-			app.Request.PostForm.Add(key, value)
+
+			app.form.Add(key, value)
 		}
-		app.form = app.Request.PostForm
 	}
 	return app.form
 }
 
+// Query reads the cache or parses values from two sources:
+// raw query in the URL;
+// parameters from router;
 func (app *App) Query() url.Values {
 
 	if app.query == nil {
 		app.query = app.Request.URL.Query()
 		// add route params to query value
 		for key, value := range app.Params {
+
 			app.query.Add(key, value)
 		}
 	}
 	return app.query
 }
 
-// View for store the view filename, if use default action name,
-// it will set the action name's first letter to lowercase
-func (app *App) View(file ...string) *App {
-
-	if len(file) == 1 {
-		app.viewFile = file[0]
-		app.viewBundle = app.Action[0:strings.Index(app.Action, ".")]
-	} else if len(file) == 2 {
-		app.viewBundle = file[0]
-		app.viewFile = file[1]
-	} else {
-		app.viewBundle = app.Action[0:strings.Index(app.Action, ".")]
+// View accepts 0-1 parameters, it reads the view file under the bundle
+// directory which the router matched.
+//
+// Most time we use this function in controllers, if you want to send
+// view file in middleware, you should use ViewBundle to set which bundle
+// directory you want to read.
+//
+// If given:
+// 0 param: will use the lowercase action name as the view file name.
+// 1 param: will use the param as the view file name.
+func (app *App) View(arg ...string) *App {
+	var file, bundle string
+	switch len(arg) {
+	case 1:
+		file = arg[0]
+	default:
 		// use action name as file name
-		app.viewFile = lowerFirstLetter(app.Action[strings.LastIndex(app.Action, ".") + 1:])
+		file = lowerFirstLetter(app.Action[strings.LastIndex(app.Action, ".") + 1:])
 	}
+	bundle = app.Action[0:strings.Index(app.Action, ".")] // app.Action looks like "bundle.Controller.Action"
+	return app.view(bundle, file, false)
+}
+
+// ViewBundle reads the view file under the given bundle directory.
+func (app *App) ViewBundle(bundle, file string) *App {
+
+	return app.view(bundle, file, false)
+}
+
+// ViewDebug will send the view file, but when pares files got error, the debug file
+// will be ignored from file trace message.
+// This function is built for debug component, it should be used in last middleware,
+// because the debug page will be sent only if normal view page has been set.
+func ViewDebug(app *App, bundle, file string) (ok bool) {
+
+	ok = false
+	for _, p := range app.viewPages {
+		if !p.Debug {
+			ok = true
+			break
+		}
+	}
+	if ok {
+		app.view(bundle, file, true)
+	}
+	return
+}
+
+func (app *App) view(bundle, file string, debug bool) *App {
+	var page view.Page
+	var subDir string
+	// get i18n view directory
+	if filter, ok := app.Get(SvcI18nFilter).(I18nFilter); ok {
+		subDir = filter.ViewSubDir()
+	}
+	dir := filepath.Join(DirBundle, bundle, "view", subDir)
+	if debug {
+		page = view.NewDebugPage(dir, file)
+	} else {
+		page = view.NewPage(dir, file)
+	}
+	app.viewPages = append(app.viewPages, page)
 	return app
 }
 
-func (app *App) With(name string, data interface{}) {
+var ErrDataExist = errors.New("view data alreay exist")
 
+func (app *App) With(name string, data interface{}) (err error) {
+
+	if _, ok := app.data[name]; ok {
+		return ErrDataExist
+	}
 	app.data[name] = data
+	return nil
 }
 
 func (app *App) Danger(msg string) {
@@ -170,9 +294,16 @@ func (app *App) FilterI18n(msg string) (i18nMsg string) {
 	}
 }
 
-func (app *App) Redirect(url string) {
+// Redirect sends redirect header to client, then to terminate the HTTP goroutine.
+func (app *App) Redirect(url string, code ...int) {
 
-	Redirect(url)
+	c := 302
+	if len(code) != 0 {
+		c = code[0]
+	}
+	http.Redirect(app.Response, app.Request, url, c)
+	panic(ErrExitGorountine)
+	// use panic because runtime.Goexit() couldn't work well under windows
 }
 
 func (app *App) JsonEncode(data interface{}) {
@@ -254,43 +385,28 @@ func (app *App) WriteString(str string) {
 	app.Response.Write([]byte(str))
 }
 
-// Flash could send the file or api data to client immediately, view files can
-// be sent multiple times, but api data can only be sent once
-func (app *App) Flash() {
+func (app *App) Defer(f func()) {
+
+	app.defers = append(app.defers, f)
+}
+
+func (app *App) flash() {
 	// send view file
-	if app.viewFile != "" {
-		var subDir string
-		if filter, ok := app.Get(SvcI18nFilter).(I18nFilter); ok {
-			subDir = filter.ViewSubDir()
-		}
-		dir := filepath.Join(DirBundle, app.viewBundle, "view", subDir)
-		err := app.VContainer.Display(app.Response, dir, app.viewFile, app.data)
+	if app.viewPages != nil {
+		err := app.VContainer.Display(app.Response, app.data, app.viewPages...)
 		if err != nil {
 			panic(err)
 		}
-
-		// api data can only be sent once
-	} else if !app.usedApi {
+	} else {
 		// send api data
 		if len(app.data) > 0 {
 			app.JsonEncode(app.data)
-			app.usedApi = true
 		}
 	}
-	// init datas
-	app.viewFile = ""
-	app.data = make(map[string]interface{}, 1)
-}
-
-// Return will flash data to client and block current http goroutine continue
-// to execute
-func (app *App) Return() {
-	app.Flash()
-	Return()
 }
 
 func (app *App) Msg(msg, typ string) {
-	// set message header for api
+	// Set message header to client for handling the response data as message data.
 	app.Response.Header().Set("Orivil-Msg", typ)
 
 	app.With("msg", map[string]string{

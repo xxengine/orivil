@@ -5,64 +5,77 @@
 package orivil
 
 import (
-	"fmt"
 	"net/http"
 	"runtime"
-	"text/template"
+	"gopkg.in/orivil/log.v0"
+	"bytes"
+	"fmt"
+	"net"
+	"html/template"
 )
 
-var tpl = template.New("error")
+var debugTpl = template.New("error")
+
+type Trace struct {
+	File string
+	Line int
+}
 
 func init() {
-	_, err := tpl.Parse(tmpl)
+	debugTpl.Funcs(template.FuncMap{
+		"minus": func(a, b int) int {
+			return a - b
+		},
+	})
+	_, err := debugTpl.Parse(debugTemplate)
 	if err != nil {
 		panic(err)
 	}
 }
 
-func CoverError(w http.ResponseWriter, r *http.Request, call func()) {
-	defer func() {
-		err := recover()
-		if err != nil {
-			if data, ok := err.(*redirect); ok {
+func handleError(w http.ResponseWriter, r *http.Request, app *App, err error) {
 
-				http.Redirect(w, r, data.url, data.code)
-			} else if _, ok := err.(*end); !ok {
+	if err == ErrExitGorountine {
+		return
+	}
 
-				w.WriteHeader(http.StatusInternalServerError)
-				if CfgApp.Debug {
-					skip := 3
-					var trace []string
-					for {
-						_, file, line, ok := runtime.Caller(skip)
-						if !ok {
-							break
-						}
-						trace = append(trace, fmt.Sprintf("%s: %d", file, line))
-						skip++
-					}
-					tpl.Execute(w, map[string]interface{}{
-						"errMsg": err,
-						"trace":  trace,
-					})
-					// Print error messages to the console, because api could not show the message
-					fmt.Println(err)
-					for _, t := range trace {
-						fmt.Println(t)
-					}
-				} else {
-					w.Write([]byte("500 Server Error"))
+	w.WriteHeader(http.StatusInternalServerError)
 
-					addr := GetIp(r)
-					Err(fmt.Errorf("Ip: %s\nUrl: %s\n %v\n", addr, r.URL.String(), err))
-				}
-			}
+	skip := 3
+	buf := bytes.NewBuffer(nil)
+	var traces []Trace
+	for {
+		_, file, line, ok := runtime.Caller(skip)
+		if !ok {
+			break
 		}
-	}()
-	call()
+		traces = append(traces, Trace{File: file, Line: line})
+		msg := fmt.Sprintf("%s: %d\n", file, line)
+		buf.WriteString(msg)
+		skip++
+	}
+
+	if CfgApp.DEBUG {
+		//errStr := strings.Replace(err.(error).Error(), "\n", "<br>", -1)
+		execErr := debugTpl.Execute(w, map[string]interface{}{
+			"errMsg": err.Error(),
+			"trace":  traces,
+		})
+		if execErr != nil {
+			log.ErrEmergency(execErr)
+		}
+	} else {
+		w.Write(internalErrorPage)
+	}
+
+	ip, e := GetIp(r)
+	if e != nil {
+		log.ErrWarn(e)
+	}
+	log.ErrEmergencyF("http panic:\n[ IP ]: \n %s \n[ URL ]: \n %s\n[ ERROR ]: \n %v\n[ TRACE ]: \n%s", ip, r.URL.String(), err, buf)
 }
 
-func GetIp(r *http.Request) string {
+func GetIp(r *http.Request) (net.IP, error) {
 
 	addr := r.Header.Get("X-Real-IP")
 	if addr == "" {
@@ -71,14 +84,72 @@ func GetIp(r *http.Request) string {
 			addr = r.RemoteAddr
 		}
 	}
-	return addr
+
+	ip, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, fmt.Errorf("userip: %q is not IP:port", addr)
+	}
+
+	userIP := net.ParseIP(ip)
+	if userIP == nil {
+		return nil, fmt.Errorf("userip: %q is not IP:port", addr)
+	}
+	return userIP, nil
 }
 
-var tmpl = `<!doctype html>
+var internalErrorPage = []byte(`<!doctype html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Orivil Panic</title>
+    <title>500 Internal Error</title>
+</head>
+<style>
+#warp {
+  position: absolute;
+  width:700px;
+  height:200px;
+  left:50%;
+  top:50%;
+  margin-left:-250px;
+  margin-top:-100px;
+}
+</style>
+<body>
+  <div id="warp">
+  	<h1>Whoops! 500 Internal Server Error</h1>
+  </div>
+</body>
+</html>`)
+
+var notFoundPage = []byte(`<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>404 Not Found</title>
+</head>
+<style>
+#warp {
+  position: absolute;
+  width:700px;
+  height:200px;
+  left:50%;
+  top:50%;
+  margin-left:-250px;
+  margin-top:-100px;
+}
+</style>
+<body>
+  <div id="warp">
+  	<h1>Whoops! 404 Page Not Found</h1>
+  </div>
+</body>
+</html>`)
+
+var debugTemplate = `<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>500 Internal Error</title>
 	<style type="text/css">
         .alert-danger {
             color: #a94442;
@@ -185,18 +256,41 @@ var tmpl = `<!doctype html>
 <body>
 	<div class="container">
 		<div class="alert alert-danger" role="alert">
-		  <strong>Error!</strong> <a title="get help?" href="orivil.com/help/{{urlquery .errMsg}}">{{html .errMsg}}</a>
+		  <strong>Error!</strong> <a title="need help?" target="_blank" href="http://orivil.com/?help={{urlquery .errMsg}}">{{.errMsg}}</a>
 		</div>
 		<div>
 			<div class="panel panel-info">
 			  <div class="panel-heading">Trace:</div>
 			  <ul class="list-group">
 				{{range .trace}}
-				<li class="list-group-item">{{.}}</li>
+				<li class="list-group-item"><a href="/{{urlquery .File}}?debug=true&line={{.Line}}#{{minus .Line 10}}" target="_blank">{{.File}}: {{.Line}}</a></li>
 				{{end}}
 			  </ul>
 			</div>
 		</div>
     </div>
+</body>
+</html>`
+
+var debugFileTemplate = `<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>File Explorer</title>
+</head>
+<body>
+<table>
+      <tbody>
+      {{range $idx, $file := .lines}}
+      <tr>
+        <td id="{{add $idx 1}}" style="text-align:right">{{add $idx 1}}</td>
+      	{{if (add $idx 1|eq $.line)}}
+        <td id="LC1" style="background:#404040; color:#FFFFFF"><pre style="margin:0;padding-left:10px;"><code>{{$file}}</code></pre></td>
+        {{else}}
+        <td id="LC1"><pre style="margin:0;padding-left:10px;"><code>{{$file}}</code></pre></td>
+        {{end}}
+      </tr>
+      {{end}}
+</tbody></table>
 </body>
 </html>`

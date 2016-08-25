@@ -5,27 +5,28 @@
 package orivil
 
 import (
-	"gopkg.in/orivil/event.v0"
 	"gopkg.in/orivil/middle.v0"
 	"gopkg.in/orivil/router.v0"
 	"gopkg.in/orivil/service.v0"
 )
 
-// every bundle register should implement Register interface
+// Every bundle register should implement Register interface.
 type Register interface {
-	RegisterRoute(c *router.Container)
+	RegRoute(c *router.Container)
 
-	RegisterService(c *service.Container)
+	RegService(c *service.Container)
 
-	RegisterMiddle(c *middle.Container)
+	RegMiddle(c *middle.Container)
 
-	Boot(c *service.Container)
+	CfgMiddle(bag *middle.Bag)
+
+	Boot(s *Server)
+
+	Close()
 }
 
+// MiddlewareConfigure provide for controllers.
 type MiddlewareConfigure interface {
-	SetMiddle(bag *middle.Bag)
-}
 
-type ServerEventListener interface {
-	AddServerListener(d *event.Dispatcher)
+	CfgMiddle(bag *middle.Bag)
 }

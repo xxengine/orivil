@@ -20,7 +20,7 @@ const (
 
 type BaseRegister struct{}
 
-func (*BaseRegister) RegisterService(c *service.Container) {
+func (*BaseRegister) RegService(c *service.Container) {
 
 	// register memory session as service
 	c.Add(SvcMemorySession, func(c *service.Container) interface{} {
@@ -54,8 +54,8 @@ func (*BaseRegister) RegisterService(c *service.Container) {
 	})
 }
 
-func (*BaseRegister) RegisterRoute(c *router.Container) {}
-
-func (*BaseRegister) RegisterMiddle(c *middle.Container) {}
-
-func (*BaseRegister) Boot(c *service.Container) {}
+func (*BaseRegister) RegRoute(c *router.Container) {}
+func (*BaseRegister) RegMiddle(c *middle.Container) {}
+func (*BaseRegister) CfgMiddle(bag *middle.Bag) {}
+func (*BaseRegister) Boot(s *Server) {}
+func (*BaseRegister) Close() {}

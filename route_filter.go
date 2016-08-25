@@ -8,7 +8,7 @@ import (
 	"reflect"
 )
 
-// RouteFilter filter actions be registered to router
+// RouteFilter filters actions be registered to router
 type RouteFilter struct {
 	structs []interface{}
 	actions []string
@@ -18,17 +18,17 @@ func NewRouteFilter() *RouteFilter {
 	return &RouteFilter{}
 }
 
-// AddStructs filter all structs methods
+// AddStructs filters structs methods
 func (f *RouteFilter) AddStructs(structs []interface{}) {
 	f.structs = structs
 }
 
-// AddActions filter all actions
+// AddActions filters actions
 func (f *RouteFilter) AddActions(actions []string) {
 	f.actions = actions
 }
 
-// implement router.ActionFilter interface for filter actions
+// FilterAction used for router.NewContainer()
 func (f *RouteFilter) FilterAction(action string) bool {
 	for _, faction := range f.actions {
 		if faction == action {

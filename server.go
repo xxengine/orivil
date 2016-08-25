@@ -3,12 +3,10 @@
 // license that can be found in the LICENSE file.
 
 // Package orivil organizes all of the server components to be one runnable server,
-// and provides some useful methods.
+// and also provides some useful methods.
 package orivil
 
 import (
-	"fmt"
-	"gopkg.in/orivil/event.v0"
 	"gopkg.in/orivil/middle.v0"
 	"gopkg.in/orivil/router.v0"
 	"gopkg.in/orivil/service.v0"
@@ -18,51 +16,29 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
-	"log"
-	"github.com/orivil/gracehttp"
 	"time"
+	"gopkg.in/orivil/grace.v0"
+	"io"
+	"os"
+	"fmt"
+	"strconv"
+	"net/url"
+	"bufio"
+	"html/template"
+)
+
+const (
+	VERSION = "v2.0"
 )
 
 const (
 	SvcApp = "orivil.App"
+	SvcServer = "orivil.Server"
 )
 
 var (
-// the unique key for server, Orivil will read the value from config file "app.yml"
+	// the unique key for server, Orivil will read the value from config file "app.yml"
 	Key string
-
-// Err for handle errors, every one could used it to handle error, and
-// this method can be re-defined by customers
-	Err = func(e error) {
-
-		log.Println(e)
-	}
-
-// this func is no need to re-defined
-	Errf = func(format string, args ...interface{}) {
-
-		Err(fmt.Errorf(format, args...))
-	}
-
-	Emer = func(e error) {
-
-		log.Println(e)
-	}
-
-	Emerf = func(format string, args ...interface{}) {
-
-		Emer(fmt.Errorf(format, args...))
-	}
-
-	Warn = func(e error) {
-
-		log.Println(e)
-	}
-
-	Warnf = func(format string, args ...interface{}) {
-
-		Warn(fmt.Errorf(format, args...))
-	}
 )
 
 type FileHandler interface {
@@ -76,26 +52,27 @@ type NotFoundHandler interface {
 	NotFound(w http.ResponseWriter, r *http.Request)
 }
 
-// CloseAble
-type CloseAble interface {
-	Close()
-}
-
 type Server struct {
 	SContainer      *service.Container
 	MContainer      *middle.Container
 	RContainer      *router.Container
 	MiddleBag       *middle.Bag
 	VContainer      *view.Container
-	Dispatcher      *event.Dispatcher
-	Registers       []Register
+	registers       []Register
 	fileHandler     FileHandler
 	notFoundHandler NotFoundHandler
-	timeOutHandler  http.Handler
-	*gracehttp.Server
+	*grace.GraceServer
 }
 
 func NewServer(addr string) *Server {
+	readTimeOut := time.Second * time.Duration(CfgApp.READ_TIMEOUT)
+	writeTimeOut := time.Second * time.Duration(CfgApp.WRITE_TIMEOUT)
+	httpServer := &http.Server{
+		Addr: addr,
+		ReadTimeout: readTimeOut,
+		WriteTimeout: writeTimeOut,
+	}
+	graceServer := grace.NewGraceServer(httpServer)
 
 	// public service container, for store "service providers"
 	sContainer := service.NewPublicContainer()
@@ -107,56 +84,43 @@ func NewServer(addr string) *Server {
 	// middlewares to service container
 	mContainer := middle.NewContainer(middleBag, sContainer)
 
-	// view compiler
-	compiler := view.NewContainer(CfgApp.Debug, CfgApp.View_file_ext)
+	// view combiner
+	combiner := view.NewContainer(CfgApp.DEBUG, CfgApp.VIEW_FILE_EXT)
 
-	// RouteFilter for filter controller actions to register to router
+	// filtering register controller actions to router
 	routeFilter := NewRouteFilter()
-	// filter controller extends methods to register to router
+
+	// filtering register controller extends methods to router
 	routeFilter.AddStructs([]interface{}{
 		&App{},
 	})
 
-	// filter actions to register to router
+	// filtering register actions to router
 	routeFilter.AddActions([]string{
 		"SetMiddle",
 	})
 
-	// route container collect all of the controller comment, and add
+	// route container collect all of the controller comments, and add
 	// them to the router if possible
-	rContainer := router.NewContainer(DirBundle, routeFilter)
+	rContainer := router.NewContainer(DirBundle, routeFilter.FilterAction)
 
-	// server dispatcher, for dispatch server event when server start
-	dispatcher := event.NewDispatcher()
-	dispatcher.AddEvents(serverEvents)
-	dispatcher.AddListener(
-		new(ServerListener),
-	)
-
-	// new server
 	server := &Server{
 		SContainer: sContainer,
 		MiddleBag:  middleBag,
 		MContainer: mContainer,
 		RContainer: rContainer,
-		VContainer: compiler,
-		Dispatcher: dispatcher,
+		VContainer: combiner,
+		GraceServer: graceServer,
 	}
 
-	// use the grace http server as default http server, this server could
-	// be hot update
-	timeOut := time.Second * time.Duration(CfgApp.Timeout)
-	server.Server = gracehttp.NewServer(addr, server, timeOut, timeOut)
+	server.Handler = server
 
-	// when the grace http server received 'stop signal', the current server
-	// will be closed, and before that, the "bundles" must be closed first
-	server.Server.AddCloseListener(server)
 
 	// set default not found handler
-	server.notFoundHandler = server
+	server.notFoundHandler = &defaultNotFoundHandler{}
 
 	// set default static file server handler
-	server.fileHandler = server
+	server.fileHandler = &defaultFileHandler{}
 
 	// register base service
 	server.RegisterBundle(
@@ -165,114 +129,172 @@ func NewServer(addr string) *Server {
 	return server
 }
 
-// SetNotFoundHandler for handle 404 not found
+func (s *Server) ListenAndServe() error {
+	// if the server was graceful stopped, the error will be nil.
+	err := s.GraceServer.ListenAndServe()
+	s.close()
+	return err
+}
+
+func (s *Server) ListenAndServeTLS(certFile, keyFile string) error {
+	err := s.GraceServer.ListenAndServeTLS(certFile, keyFile)
+	s.close()
+	return err
+}
+
+// SetNotFoundHandler sets the 404 not found handler.
 func (s *Server) SetNotFoundHandler(h NotFoundHandler) {
 	s.notFoundHandler = h
 }
 
-// Close for close bundle registers, this function will be auto executed
-func (s *Server) Close() {
-
-	log.Println("closing bundle register...")
-	for _, reg := range s.Registers {
-		if clo, ok := reg.(CloseAble); ok {
-			clo.Close()
-		}
-	}
-}
-
-// SetFileHandler for set customer file handler
+// SetFileHandler sets the static file handler.
 func (s *Server) SetFileHandler(h FileHandler) {
 	s.fileHandler = h
 }
 
-// AddServerListener for add server event listeners
-func (s *Server) AddServerListener(ls ...event.Listener) {
-	s.Dispatcher.AddListener(ls...)
-}
-
-// HandleFile for judge the client whether or not to request a static file,
-// this function could be replaced by customers
-func (s *Server) HandleFile(r *http.Request) bool {
-	return filepath.Ext(r.URL.Path) != ""
-}
-
-// ServeFile for serve static file, this function could be replaced by customers
-func (s *Server) ServeFile(w http.ResponseWriter, r *http.Request, name string) {
-	http.ServeFile(w, r, name)
-}
-
-// ServeHTTP for serve http request, every request goes through the function,
-// include static file request
+// ServeHTTP serves the incoming http request, every request goes through the function,
+// including static file requests.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+
+	start := time.Now()
 	path := r.URL.Path
 	// handle static file
 	if s.fileHandler.HandleFile(r) {
-		s.fileHandler.ServeFile(w, r, filepath.Join(DirStaticFile, path))
+		s.serveFile(w, r, path)
 	} else {
+
 		var app *App
-		CoverError(w, r, func() {
-			path = r.Method + path
-
-			// match route
-			if action, params, controller, ok := s.RContainer.Match(path); ok {
-
-				// new private container
-				privateContainer := service.NewPrivateContainer(s.SContainer)
-
-				// new app
-				app = &App{
-					Params:    params,
-					Action:    action,
-					Response:  w,
-					Request:   r,
-					Container: privateContainer,
-					VContainer: s.VContainer,
-					data:  make(map[string]interface{}, 1),
+		defer func() {
+			err := recover()
+			if app != nil {
+				s.storeSession(app)
+				for _, f := range app.defers {
+					f()
 				}
-
-				// set "app" instance to private container, so the private container could
-				// use "app" as service
-				app.AddCache(SvcApp, app)
-
-				// match middleware
-				middleNames := s.MContainer.Get(action)
-				middles := make([]interface{}, len(middleNames))
-
-				// get middleware instances from private container
-				for index, service := range middleNames {
-					middles[index] = privateContainer.Get(service)
-				}
-
-				// call middlewares
-				s.callMiddles(middles, app)
-
-				// call controller action
-				value := reflect.ValueOf(controller())
-				s.setControllerDependence(value, app)
-				method := action[strings.LastIndex(action, ".") + 1:]
-				actionFun, _ := value.Type().MethodByName(method)
-				actionFun.Func.Call([]reflect.Value{value})
-
-				// send view file or api data
-				app.Flash()
-
-				// call "Terminate" middlewares
-				s.callMiddlesTerminate(middles, app)
-			} else {
-				s.notFoundHandler.NotFound(w, r)
 			}
-		})
+			if err, ok := err.(error); ok {
+				handleError(w, r, app, err)
+			} else if err != nil {
+				panic(err)
+			}
+		}()
 
-		if app != nil {
-			s.storeSession(app)
+		path = r.Method + path
+
+		// match route
+		if action, params, controller, ok := s.RContainer.Match(path); !ok {
+
+			s.notFoundHandler.NotFound(w, r)
+		} else {
+			// new private container
+			privateContainer := service.NewPrivateContainer(s.SContainer)
+
+			// new app
+			app = &App{
+				Params:    params,
+				Action:    action,
+				Response:  w,
+				Request:   r,
+				Container: privateContainer,
+				VContainer: s.VContainer,
+				Server: s,
+				data:  make(map[string]interface{}, 1),
+				Start: start,
+			}
+
+			// cache the orivil.App and orivil.Server to private container.
+			app.AddCache(SvcApp, app)
+			app.AddCache(SvcServer, s)
+
+			// match middleware
+			middleNames := s.MContainer.Get(action)
+			middles := make([]interface{}, len(middleNames))
+
+			// get middleware instances from private container
+			for index, service := range middleNames {
+				middles[index] = privateContainer.Get(service)
+			}
+
+			// call middleware
+			s.callMiddles(middles, app)
+
+			// call controller action
+			value := reflect.ValueOf(controller())
+			s.setControllerDependence(value, app)
+			method := action[strings.LastIndex(action, ".") + 1:]
+			actionFun, _ := value.Type().MethodByName(method)
+			actionFun.Func.Call([]reflect.Value{value})
+
+			// call "Terminate" middleware
+			s.callMiddlesTerminate(middles, app)
+
+			// send view file or api data
+			app.flash()
 		}
 	}
 }
 
-// implement NotFoundHandler interface
-func (s *Server) NotFound(w http.ResponseWriter, r *http.Request) {
-	http.NotFound(w, r)
+func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, urlPath string) {
+	var filename string
+	if CfgApp.DEBUG {
+		q := r.URL.Query()
+		debug := q.Get("debug")
+		if debug == "true" {
+			line, err := strconv.Atoi(q.Get("line"))
+			if err != nil {
+				panic(err)
+			}
+			filename, err := url.QueryUnescape(urlPath)
+			if err != nil {
+				panic(err)
+			}
+			filename = filename[1:]
+			file, err := os.Open(filename)
+			if err != nil {
+				panic(err)
+			}
+			var lines []string
+			scanner := bufio.NewScanner(file)
+			for scanner.Scan() {
+				lines = append(lines, scanner.Text())
+			}
+			if err := scanner.Err(); err != nil {
+				panic(err)
+			}
+			tpl := template.New("debug")
+			tpl.Funcs(template.FuncMap{
+				"add": func(a, b int) int {
+					return a + b
+				},
+			})
+			_, err = tpl.Parse(debugFileTemplate)
+			if err != nil {
+				panic(err)
+			}
+			err = tpl.Execute(w, map[string]interface{}{
+				"lines": lines,
+				"line": line,
+			})
+			if err != nil {
+				panic(err)
+			}
+			return
+		}
+	}
+
+	if strings.HasPrefix(urlPath, "/bundle-") {
+		str := strings.TrimPrefix(urlPath, "/bundle-")
+		firstIdx := strings.Index(str, "/")
+		var bundle string
+		if firstIdx > 1 && firstIdx < len(str) {
+			bundle = str[:firstIdx]
+			urlPath = str[firstIdx:]
+		}
+		filename = filepath.Join(DirBundle, bundle, "public", urlPath)
+	} else {
+		filename = filepath.Join(DirStaticFile, urlPath)
+	}
+	s.fileHandler.ServeFile(w, r, filename)
 }
 
 func (s *Server) storeSession(a *App) {
@@ -320,53 +342,113 @@ func (s *Server) callMiddlesTerminate(middles []interface{}, app *App) {
 	}
 }
 
-func (s *Server) PrintMsg() {
+func (s *Server) Version() string {
+
+	return VERSION
+}
+
+// PrintInfo prints the server information to os.Stdout.
+func (s *Server) PrintInfo() {
+
+	s.PrintInfoAt(os.Stdout)
+}
+
+// PrintInfoAt prints the server information to the param w
+func (s *Server) PrintInfoAt(w io.Writer) {
 	routeMsg := router.GetAllRouteMsg(s.RContainer)
-	fmt.Println()
-	fmt.Println("all routes:")
+	fmt.Fprintf(w, "\n[routes]:\n")
 	for _, msg := range routeMsg {
-		fmt.Println(msg)
+		fmt.Fprintln(w, msg)
 	}
 
 	actions := s.RContainer.GetActions()
 	middleMsg := middle.GetMiddlesMsg(s.MContainer, actions)
-	fmt.Println()
-	fmt.Println("all middlewares:")
+	fmt.Fprintf(w, "\n[middlewares]:\n")
 	for _, msg := range middleMsg {
-		fmt.Println(msg)
+		fmt.Fprintln(w, msg)
 	}
 }
 
-func (s *Server) Run() {
+// RegisterBundle collects all bundle registers
+func (s *Server) RegisterBundle(r ...Register) {
+	s.registers = append(s.registers, r...)
+}
 
-	// add listeners from bundle registers
-	s.addServerListener(s.Registers)
+// Initialize all bundles
+func (s *Server) Init() {
 
-	// register service
-	s.Dispatcher.Trigger(EvtRegisterService, s)
+	// register services
+	for _, r := range s.registers {
+		r.RegService(s.SContainer)
+	}
 
-	// register route
-	s.Dispatcher.Trigger(EvtRegisterRoute, s)
+	// register routes
+	for _, r := range s.registers {
+		r.RegRoute(s.RContainer)
+	}
+
 
 	// register middleware
-	s.Dispatcher.Trigger(EvtRegisterMiddle, s)
+	for _, r := range s.registers {
+		r.RegMiddle(s.MContainer)
+	}
 
-	// config provider
-	s.Dispatcher.Trigger(EvtConfigProvider, s)
-
-	// boot all provider
-	s.Dispatcher.Trigger(EvtBootProvider, s)
-}
-
-func (s *Server) addServerListener(registers []Register) {
-	for _, provider := range registers {
-		if listenable, ok := provider.(ServerEventListener); ok {
-			listenable.AddServerListener(s.Dispatcher)
+	allActions := s.RContainer.GetActions()
+	for bundle, controllers := range allActions {
+		for controller, actions := range controllers {
+			s.MiddleBag.AddController(bundle, controller, actions)
 		}
+	}
+
+	// config middleware
+	for _, r := range s.registers {
+
+		bundle := filepath.Base(reflect.TypeOf(r).Elem().PkgPath())
+		s.MiddleBag.SetCurrent(bundle, "")
+		r.CfgMiddle(s.MiddleBag)
+	}
+
+	cProviders := s.RContainer.GetControllers()
+	for bundle, controllers := range allActions {
+		for controller, _ := range controllers {
+			c := cProviders[bundle + "." + controller]()
+			s.MiddleBag.SetCurrent(bundle, controller)
+			if r, ok := c.(MiddlewareConfigure); ok {
+				r.CfgMiddle(s.MiddleBag)
+			}
+		}
+	}
+
+	// boot services
+	for _, r := range s.registers {
+		r.Boot(s)
 	}
 }
 
-// RegisterBundle for add bundle register to the server
-func (s *Server) RegisterBundle(app ...Register) {
-	s.Registers = append(s.Registers, app...)
+func (s *Server) close() {
+	for _, r := range s.registers {
+		r.Close()
+	}
+}
+
+// defaultFileHandler implements "FileHandler" interface for handling static files.
+type defaultFileHandler struct{}
+
+// HandleFile checks whether or not to handle the request as static file request.
+func (s *defaultFileHandler) HandleFile(r *http.Request) bool {
+	return filepath.Ext(r.URL.Path) != ""
+}
+
+// ServeFile serves static file
+func (s *defaultFileHandler) ServeFile(w http.ResponseWriter, r *http.Request, name string) {
+	http.ServeFile(w, r, name)
+}
+
+// implements NotFoundHandler interface
+type defaultNotFoundHandler struct{}
+
+func (h *defaultNotFoundHandler) NotFound(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(404)
+	w.Write(notFoundPage)
 }

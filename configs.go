@@ -11,41 +11,45 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"gopkg.in/orivil/log.v0"
+	"fmt"
 )
 
 // server config
 var CfgApp = &struct {
-	Debug                     bool
-	Key                       string
-	View_file_ext             string
-	Memory_session_key        string
-	Memory_session_max_age    int // minute
-	Memory_GC_check_num       int
-	Permanent_session_key     string
-	Permanent_session_max_age int // minute
-	Permanent_GC_check_num    int
-	Timeout                   int // second
+	DEBUG                     bool
+	KEY                       string
+	VIEW_FILE_EXT             string
+	MEMORY_SESSION_KEY        string
+	MEMORY_SESSION_MAX_AGE    int // minute
+	MEMORY_GC_CHECK_NUM       int
+	PERMANENT_SESSION_KEY     string
+	PERMANENT_SESSION_MAX_AGE int // minute
+	PERMANENT_GC_CHECK_NUM    int
+	READ_TIMEOUT              int // second
+	WRITE_TIMEOUT             int // second
 }{
 	// default config
-	Debug:                     true,
-	Key:                       "--------------------------------------",
-	View_file_ext:             ".tmpl",
-	Memory_session_key:        "orivil-memory-session",
-	Permanent_session_key:     "orivil-permanent-session",
-	Memory_GC_check_num:       3,
-	Memory_session_max_age:    45,
-	Permanent_session_max_age: 45,
-	Permanent_GC_check_num:    3,
-	Timeout:                   10,
+	DEBUG:                     true,
+	KEY:                       "--------------------------------------",
+	VIEW_FILE_EXT:             ".tmpl",
+	MEMORY_SESSION_KEY:        "orivil-memory-session",
+	MEMORY_SESSION_MAX_AGE:    45,
+	MEMORY_GC_CHECK_NUM:       3,
+	PERMANENT_SESSION_KEY:     "orivil-permanent-session",
+	PERMANENT_SESSION_MAX_AGE: 45,
+	PERMANENT_GC_CHECK_NUM:    3,
+	READ_TIMEOUT:              30,
+	WRITE_TIMEOUT:             30,
 }
 
 // dirs
 var (
-	DirBase       = getBaseDir()
+	DirBase = getBaseDir()
 	DirStaticFile = filepath.Join(DirBase, "public")
-	DirBundle     = filepath.Join(DirBase, "bundle")
-	DirConfig     = filepath.Join(DirBase, "config")
-	DirCache      = filepath.Join(DirBase, "cache")
+	DirBundle = filepath.Join(DirBase, "bundle")
+	DirConfig = filepath.Join(DirBase, "config")
+	DirCache = filepath.Join(DirBase, "cache")
 )
 
 var Cfg = config.NewConfig(DirConfig)
@@ -54,30 +58,31 @@ func init() {
 
 	err := Cfg.ReadStruct("app.yml", CfgApp)
 	if err != nil {
-		Errf("%v\nread 'app.yml' got error, use default value instead.", err)
+		log.ErrInfoF("%v\nread 'app.yml' got error, use default value instead.", err)
 	}
 
-	Key = CfgApp.Key
+	Key = CfgApp.KEY
 
 	session.ConfigMemory(
-		CfgApp.Memory_session_max_age,
-		CfgApp.Memory_GC_check_num,
-		CfgApp.Memory_session_key,
+		CfgApp.MEMORY_SESSION_MAX_AGE,
+		CfgApp.MEMORY_GC_CHECK_NUM,
+		CfgApp.MEMORY_SESSION_KEY,
 	)
 	session.ConfigPermanent(
-		CfgApp.Permanent_session_max_age,
-		CfgApp.Permanent_GC_check_num,
-		CfgApp.Permanent_session_key,
+		CfgApp.PERMANENT_SESSION_MAX_AGE,
+		CfgApp.PERMANENT_GC_CHECK_NUM,
+		CfgApp.PERMANENT_SESSION_KEY,
 	)
 }
 
 func getBaseDir() string {
-	dir, err := os.Getwd()
+	cDir, err := os.Getwd()
 	if err != nil {
 		panic(err)
 	}
-	if helper.IsExist(filepath.Join(dir, "bundle")) {
-		return dir
+
+	if helper.IsExist(filepath.Join(cDir, "bundle")) {
+		return cDir
 	} else {
 		file, err := exec.LookPath(os.Args[0])
 		if err != nil {
@@ -87,7 +92,15 @@ func getBaseDir() string {
 		if err != nil {
 			panic(err)
 		}
-		dir = filepath.Dir(path)
-		return dir
+		eDir := filepath.Dir(path)
+
+		if helper.IsExist(filepath.Join(eDir, "bundle")) {
+			return eDir
+		} else {
+			fmt.Printf("Directory 'bundle' not exist in current directory: [%s] "+
+			"or executable file directory: [%s]", cDir, eDir)
+			os.Exit(1)
+		}
 	}
+	return ""
 }
