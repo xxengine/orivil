@@ -1,0 +1,11 @@
+from: "example.com <admin@example.com>"
+
+user: "user@qq.com"
+
+password: "********"
+
+host: "smtp.qq.com"
+
+port: ":465"
+
+type: "text/html; charset=UTF-8"

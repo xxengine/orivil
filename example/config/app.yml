@@ -1,0 +1,28 @@
+# set debug mode
+debug: false
+
+# the server unique key, must be changed
+key: "u60zpqmcmowawqzpolmkijnvmfjidso934k"
+
+# view file extension
+view_file_ext: ".html"
+
+# for timeout handler (/second)
+timeout: 10
+
+# memory session cookie key
+memory_session_key: "orivil-memory-session"
+
+# permanent session cookie key
+permanent_session_key: "orivil-permanent-session"
+
+# (/minute)
+memory_session_max_age: 45
+
+# (/minute)
+permanent_session_max_age: 45
+
+# number of random checks in each update
+memory_gc_check_num: 3
+
+permanent_gc_check_num: 3

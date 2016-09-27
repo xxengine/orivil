@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="/debug/uikit/css/uikit.gradient.min.css"/>
+    <link rel="stylesheet" href="/debug/uikit/css/components/notify.gradient.min.css"/>
+    <link rel="stylesheet" href="/debug/uikit/css/components/tooltip.gradient.min.css"/>
+    <link rel="stylesheet" href="/debug/highlight/default.css"/>
+    <script src="/debug/js/jquery-2.1.4.min.js"></script>
+    <script src="/debug/uikit/js/uikit.min.js"></script>
+    <script src="/debug/uikit/js/components/notify.min.js"></script>
+    <script src="/debug/uikit/js/components/tooltip.min.js"></script>
+    <script src="/debug/highlight/highlight.pack.js"></script>
+    <style>
+        #debug-group {
+            position: fixed;
+            opacity: 0.5;
+            z-index: 1039;
+            top: auto;
+            left: auto;
+            right: 10px;
+            bottom: 10px;
+        }
+
+        #debug-group:hover, #debug-group:focus {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+<div id="debug-group" class="uk-button-group">
+
+    <div data-uk-dropdown="{mode:'click', remaintime:100, pos:'top-right'}">
+        <a class="uk-button uk-button-small" title="History" data-uk-tooltip href="javascript:void(0);"><i
+                    class="uk-icon-history"></i></a>
+        <div class="uk-dropdown uk-dropdown-top debug-dropdown" style="width:auto;overflow-y:auto;">
+            <ul id="debug-group-server-history" class="uk-nav uk-nav-dropdown">
+                <li class="uk-nav-header">History</li>
+                <li class="uk-nav-divider"></li>
+            </ul>
+        </div>
+    </div>
+
+    <div data-uk-dropdown="{mode:'click', remaintime:100, pos:'top-right'}">
+        <a title="Sql Query" data-uk-tooltip class="uk-button uk-button-small" href="javascript:void(0);"><i
+                    class="uk-icon-search"></i></a>
+        <div class="uk-dropdown uk-dropdown-top debug-dropdown" style="width:auto;overflow-y:auto;">
+            <ul id="debug-group-sql-query" class="uk-nav uk-nav-dropdown">
+                <li class="uk-nav-header">Sql Query</li>
+                <li class="uk-nav-divider"></li>
+            </ul>
+        </div>
+    </div>
+
+    <div data-uk-dropdown="{mode:'click', remaintime:100, pos:'top-right'}">
+        <a class="uk-button uk-button-small" title="Template" data-uk-tooltip href="javascript:void(0);"><i
+                    class="uk-icon-file-code-o"></i></a>
+        <div class="uk-dropdown uk-dropdown-top debug-dropdown" style="width:auto;overflow-y:auto;">
+            <ul class="uk-nav uk-nav-dropdown">
+                <li class="uk-nav-header">Template</li>
+                <li class="uk-nav-divider"></li>
+                <li>
+                    <pre><code id="debug-group-merged-html" class="html"></code></pre>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <div data-uk-dropdown="{mode:'click', remaintime:100, pos:'top-right'}">
+        <a class="uk-button uk-button-small" title="Routes" data-uk-tooltip href="javascript:void(0);"><i
+                    class="uk-icon-sitemap"></i></a>
+        <div class="uk-dropdown uk-dropdown-top debug-dropdown" style="width:auto;overflow-y:auto;">
+            <ul class="uk-nav uk-nav-dropdown">
+                <li class="uk-nav-header">Route & Middleware</li>
+                <li class="uk-nav-divider"></li>
+                <li>
+                    <pre><code class="nohighlight">{{.debugRouteAndMiddles}}</code></pre>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <div data-uk-dropdown="{mode:'click', remaintime:100, pos:'top-right'}">
+        <a class="uk-button uk-button-small" title="Environment" data-uk-tooltip href="javascript:void(0);"><i
+                    class="uk-icon-info-circle"></i></a>
+        <div class="uk-dropdown uk-dropdown-top debug-dropdown"  style="width:auto;overflow-y:auto;">
+            <ul class="uk-nav uk-nav-dropdown">
+                <li class="uk-nav-header">Environment</li>
+                <li class="uk-nav-divider"></li>
+                {{range .debugEnvironment}}
+                <li><span style="padding:3px 15px">{{.}}</span></li>
+                {{end}}
+            </ul>
+        </div>
+    </div>
+    <a id="debug-group-close" class="uk-button uk-button-small" data-uk-tooltip href="javascript:void(0);"
+       title="Close"><i
+                class="uk-icon-close"></i></a>
+</div>
+</body>
+<script>
+    var $container = $("#debug-group");
+    var $history = $("#debug-group-server-history");
+    var $mergeHtml = $("#debug-group-merged-html");
+    var $query = $("#debug-group-sql-query");
+    var $close = $("#debug-group-close");
+    var $dropdown = $(".debug-dropdown");
+
+    $(document).ready(function () {
+        $close.on("click", function () {
+            $container.hide()
+        });
+
+        $dropdown.height($(window).height()-100);
+        $dropdown.width($(window).width()-100);
+
+        $.ajax({
+            url: "/debug/history",
+            success: function (data) {
+                if (!!data) {
+                    for (var idx in data) {
+                        $history.append('<li><pre style="margin:0;padding:0;"><code>' + data[idx] + '</code></pre></li>')
+                    }
+                }
+            }
+        });
+
+        $.ajax({
+            url: "/debug/mergedHtml",
+            success: function (data) {
+                $mergeHtml.text(data);
+                $('pre code:not(.hljs)').each(function (i, block) {
+                    hljs.highlightBlock(block);
+                });
+            }
+        });
+
+        $.ajax({
+            url: "/debug/sqlQuery",
+            success: function (data) {
+                if (!!data) {
+                    for (var idx in data) {
+                        $query.append('<li><pre><code class="sql">' + data[idx] + '</code></pre></li>')
+                    }
+                    $('pre code:not(.hljs)').each(function (i, block) {
+                        hljs.highlightBlock(block);
+                    });
+                }
+            }
+        })
+    })
+</script>
+</html>

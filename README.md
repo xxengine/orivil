@@ -6,29 +6,30 @@ Fast & Simple & Powerful Go Web Framework. Inspired by [Symfony](http://symfony.
 ## Version
 
 ```
-v1.0
+v2.0
 ```
 
 ## Overview
 
-* Use service container to manage services.
-* Fantastic view file compiler.
-* Semantic management of middleware.
-* Automatic generate controller routes.
-* Could cache view file, could cache services, support memory session.
-* Made up of components, every user could be a contributor.
-* Automatic generate I18n files, including view file and configuration file.
+* micro MVC(alpha version)
+* service container
+* view compiler
+* middleware
+* comment routes
+* fast speed
+* components
+* I18n
 
 ## Install
 
 ```
-go get -v gopkg.in/orivil/orivil.v1
+go get -v gopkg.in/orivil/orivil.v2
 ```
 
 ## Run Example
 
 ```
-cd $GOPATH/src/gopkg.in/orivil/orivil.v1/example_server/base_server
+cd $GOPATH/src/gopkg.in/orivil/orivil.v2/example
 
 go run main.go
 ```
@@ -37,30 +38,6 @@ go run main.go
 
 ```
 Browser visit: http://localhost:8080
-```
-
-## ApacheBench Test
-#### Env
-
-* OS: ubuntu 14.04 LTS
-* CPU: Intel® Core™ i7-2600K
-* GO: go1.6 linux/amd64
-* DEBUG: false
-
-#### Without Session
-
-> ab -c 1000 -n 100000 http://localhost:8080/
->
-```
-Requests per second:    18693.95 [#/sec] (mean)
-```
-
-#### With Memory Session
-
-> ab -c 1000 -n 100000 http://localhost:8080/set-session/ooorivil
->
-```
-Requests per second:    18150.50 [#/sec] (mean)
 ```
 
 ## Community
