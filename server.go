@@ -12,7 +12,6 @@ import (
 	"gopkg.in/orivil/service.v0"
 	"gopkg.in/orivil/session.v0"
 	"gopkg.in/orivil/view.v0"
-	"gopkg.in/orivil/watcher.v0"
 	"net/http"
 	"path/filepath"
 	"reflect"
@@ -26,7 +25,11 @@ import (
 	"net/url"
 	"bufio"
 	"html/template"
-	"gopkg.in/orivil/validator.v0"
+
+	// import these packages for downloading them
+	_ "gopkg.in/orivil/xsrftoken.v0"
+	_ "gopkg.in/orivil/validator.v0"
+	_ "gopkg.in/orivil/watcher.v0"
 )
 
 const (
@@ -41,11 +44,6 @@ const (
 var (
 	// the unique key for server, Orivil will read the value from config file "app.yml"
 	Key string
-
-	// import these packages for downloading them
-	_ watcher.AutoCommand
-
-	_ validator.Validator
 )
 
 type FileHandler interface {
